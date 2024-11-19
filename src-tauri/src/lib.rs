@@ -1,4 +1,4 @@
-use tauri::{tray::TrayIconBuilder, Manager, Window};
+use tauri::{tray::TrayIconBuilder, Window};
 
 #[tauri::command]
 fn minimize_window(window: Window) {
@@ -22,6 +22,12 @@ pub fn run() {
     //     Ok(())
     // })
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![
+            minimize_window,
+            maximize_window,
+            close_window
+        ])
         .setup(|app| {
             let tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -36,26 +42,28 @@ pub fn run() {
                         println!("left click pressed and released");
                         // in this example, let's show and focus the main window when the tray is clicked
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        let webview_window = tauri::WebviewWindowBuilder::new(
+                            app,
+                            "main",
+                            tauri::WebviewUrl::App("index.html".into()),
+                        )
+                        .decorations(false)
+                        .build();
                     }
                     _ => {}
                 })
                 .build(app)?;
-            let webview_window = tauri::WebviewWindowBuilder::new(
-                app,
-                "main",
-                tauri::WebviewUrl::App("index.html".into()),
-            )
-            .decorations(false)
-            .build()?;
-            webview_window.hide().unwrap();
+
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                api.prevent_exit();
+            }
+            _ => {}
+        });
     // tauri::Builder::default()
     //     .plugin(tauri_plugin_shell::init())
     //     .invoke_handler(tauri::generate_handler![
