@@ -40,7 +40,6 @@ pub fn run() {
                         button_state,
                     } => {
                         println!("left click pressed and released");
-                        // in this example, let's show and focus the main window when the tray is clicked
                         let app = tray.app_handle();
                         let webview_window = tauri::WebviewWindowBuilder::new(
                             app,
@@ -64,14 +63,4 @@ pub fn run() {
             }
             _ => {}
         });
-    // tauri::Builder::default()
-    //     .plugin(tauri_plugin_shell::init())
-    //     .invoke_handler(tauri::generate_handler![
-    //         greet,
-    //         minimize_window,
-    //         maximize_window,
-    //         close_window
-    //     ])
-    //     .run(tauri::generate_context!())
-    //     .expect("error while running tauri application");
 }
