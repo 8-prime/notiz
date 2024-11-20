@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import Titlebar from "./components/titlebar";
+import NoteEditor from "./components/NoteEditor";
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -12,23 +13,9 @@ function App() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-start h-screen">
+    <main className="flex flex-col items-center justify-start h-screen w-screen">
       <Titlebar />
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      <NoteEditor />
     </main>
   );
 }
