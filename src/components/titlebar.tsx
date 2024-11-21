@@ -28,13 +28,13 @@ export default function Titlebar() {
     return (
         <div data-tauri-drag-region className="w-screen h-10 flex justify-end items-center">
             <button onClick={handleMinimize} >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="18" x2="19" y2="18"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="18" x2="19" y2="18"></line></svg>
             </button>
             <button onClick={handleMaximize} >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="7" x2="19" y2="7"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="7" x2="19" y2="7"></line></svg>
             </button>
             <button onClick={handleClose} >
-                <X />
+                <X strokeWidth={1} />
             </button>
         </div>
     );

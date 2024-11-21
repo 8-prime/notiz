@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-fn main() {
-    notiz_lib::run()
+mod database;
+
+#[tokio::main]
+async fn main() {
+    notiz_lib::run().await;
 }

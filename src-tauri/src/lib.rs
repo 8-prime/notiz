@@ -1,5 +1,7 @@
 use tauri::{tray::TrayIconBuilder, Window};
 
+mod database;
+
 #[tauri::command]
 fn minimize_window(window: Window) {
     window.minimize().unwrap();
@@ -15,18 +17,22 @@ fn close_window(window: Window) {
     window.close().unwrap();
 }
 
+#[tauri::command]
+fn changes(value: &str) {
+    println!("Changes: {}", value);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    // tauri::Builder::default().plugin(tauri_plugin_global_shortcut::Builder::new().build()).setup(|app| {
-    //     let tray = TrayIconBuilder::new().build(app)?;
-    //     Ok(())
-    // })
+pub async fn run() {
+    let db = database::init().await.unwrap();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             minimize_window,
             maximize_window,
-            close_window
+            close_window,
+            changes
         ])
         .setup(|app| {
             #[cfg(desktop)]

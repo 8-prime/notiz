@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { Dot, Save } from "lucide-react";
 import React from "react";
 import { useDebouncedCallback } from "use-debounce";
@@ -18,6 +19,7 @@ export default function NoteEditor() {
         // function
         (value) => {
             setChanges(false);
+            invoke("changes", { value })
         },
         // delay in ms
         300
