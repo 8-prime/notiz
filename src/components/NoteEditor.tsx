@@ -3,11 +3,25 @@ import { Dot, Save } from "lucide-react";
 import React from "react";
 import { useDebouncedCallback } from "use-debounce";
 
+export type Note = {
+    id: string | undefined;
+    title: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export default function NoteEditor() {
 
     const ref = React.useRef<HTMLTextAreaElement>(null);
     const [changes, setChanges] = React.useState(false);
-    const [content, setContent] = React.useState("")
+    const [content, setContent] = React.useState<Note>({
+        id: undefined,
+        title: "",
+        content: "",
+        created_at: "",
+        updated_at: ""
+    })
 
     React.useEffect(() => {
         if (ref.current) {
@@ -17,9 +31,15 @@ export default function NoteEditor() {
 
     const debounced = useDebouncedCallback(
         // function
-        (value) => {
+        (value: Note) => {
             setChanges(false);
-            invoke("changes", { value })
+            console.log("updating to backend");
+
+            invoke("changes", { data: value }).then((update) => {
+                console.log(update);
+
+                setContent(update as Note);
+            })
         },
         // delay in ms
         300
@@ -27,8 +47,14 @@ export default function NoteEditor() {
 
     const textChanged = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setChanges(true);
-        debounced(e.target.value);
-        setContent(e.target.value);
+        debounced({
+            ...content,
+            title: e.target.value
+        });
+        setContent({
+            ...content,
+            content: e.target.value
+        });
     }
 
     return (
@@ -37,7 +63,7 @@ export default function NoteEditor() {
                 <textarea
                     className="w-full h-full p-4 text-sm text-gray-800 bg-white rounded-lg  focus:outline-none resize-none"
                     ref={ref}
-                    value={content}
+                    value={content.content}
                     onChange={textChanged}
                 />
             </div>

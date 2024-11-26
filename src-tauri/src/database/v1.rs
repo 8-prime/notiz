@@ -16,7 +16,7 @@ pub fn define_models(models: &mut Models) -> eyre::Result<()> {
 #[native_db]
 pub struct Note {
     #[primary_key]
-    pub id: DatabaseUuid,
+    pub id: Option<DatabaseUuid>,
     pub title: String,
     pub content: String,
     pub created_at: String,

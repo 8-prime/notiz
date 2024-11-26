@@ -4,6 +4,7 @@ use native_db::{Builder, Database, Key, Models, ToKey};
 use once_cell::sync::Lazy;
 use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::path::Path;
 use tokio::fs;
 
 use serde::{Deserialize, Serialize};
@@ -57,7 +58,7 @@ static MODELS: Lazy<Models> = Lazy::new(|| {
     models
 });
 
-pub async fn init() -> eyre::Result<Database<'static>> {
-    fs::create_dir_all("./data").await?;
-    Ok(Builder::new().create(&MODELS, "./data/db.redb")?)
+pub async fn init(data_dir: &str) -> eyre::Result<Database<'static>> {
+    fs::create_dir_all(data_dir).await?;
+    Ok(Builder::new().create(&MODELS, Path::new(data_dir).join("db.redb"))?)
 }

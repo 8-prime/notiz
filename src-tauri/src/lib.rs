@@ -1,4 +1,6 @@
-use tauri::{tray::TrayIconBuilder, Window};
+use database::{DatabaseUuid, Note};
+use tauri::{tray::TrayIconBuilder, Manager, State, Window};
+use tokio::sync::Mutex;
 
 mod database;
 
@@ -18,14 +20,44 @@ fn close_window(window: Window) {
 }
 
 #[tauri::command]
-fn changes(value: &str) {
-    println!("Changes: {}", value);
+async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<Note, String> {
+    let state = state.lock().await;
+    let rw = state.db.rw_transaction().map_err(|err| err.to_string())?;
+
+    if data.id.is_none() {
+        println!("Changes called with new note");
+        let note = Note {
+            id: Some(DatabaseUuid::new()),
+            ..data
+        };
+        rw.insert(note.clone()).map_err(|err| err.to_string())?;
+        rw.commit().map_err(|err| {
+            "Failed to update article: Could not commit transaction ({err})".to_string()
+        })?;
+        return Ok(note);
+    }
+    println!("Changes called with existing note");
+
+    let old_note = rw
+        .get()
+        .primary::<Note>(data.id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| "Note not found".to_string())?;
+    rw.update(old_note, data.clone())
+        .map_err(|err| err.to_string())?;
+    rw.commit().map_err(|err| {
+        "Failed to update article: Could not commit transaction ({err})".to_string()
+    })?;
+
+    Ok(data)
+}
+
+struct AppState {
+    db: native_db::Database<'static>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
-    let db = database::init().await.unwrap();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
@@ -35,6 +67,15 @@ pub async fn run() {
             changes
         ])
         .setup(|app| {
+            let handle = app.handle().clone();
+
+            tauri::async_runtime::spawn(async move {
+                let binding = handle.path().app_data_dir().unwrap();
+                let app_data_dir = binding.to_str().unwrap();
+                let db = database::init(app_data_dir).await.unwrap();
+                handle.manage(Mutex::new(AppState { db }));
+            });
+
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::{
