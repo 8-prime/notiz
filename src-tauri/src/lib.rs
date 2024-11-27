@@ -1,6 +1,9 @@
+#![feature(iterator_try_collect)]
+
 use database::{DatabaseUuid, Note};
 use tauri::{tray::TrayIconBuilder, Manager, State, Window};
 use tokio::sync::Mutex;
+use uuid::{uuid, Uuid};
 
 mod database;
 
@@ -17,6 +20,39 @@ fn maximize_window(window: Window) {
 #[tauri::command]
 fn close_window(window: Window) {
     window.close().unwrap();
+}
+
+#[tauri::command]
+async fn get_note(
+    id: Option<DatabaseUuid>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<Note, String> {
+    let state = state.lock().await;
+    let r = state.db.r_transaction().map_err(|err| err.to_string())?;
+    println!("get_note called with id: {:?}", id);
+    let note = r
+        .get()
+        .primary::<Note>(id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| "Note not found".to_string())?;
+    print!("{:?}", note);
+    Ok(note)
+}
+
+#[tauri::command]
+async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, String> {
+    let state = state.lock().await;
+    let r = state.db.r_transaction().map_err(|err| err.to_string())?;
+
+    let notes = r
+        .scan()
+        .primary::<Note>()
+        .map_err(|err| err.to_string())?
+        .all()
+        .map_err(|err| err.to_string())?
+        .try_collect::<Vec<Note>>()
+        .map_err(|err| err.to_string())?;
+    Ok(notes)
 }
 
 #[tauri::command]
@@ -64,7 +100,9 @@ pub async fn run() {
             minimize_window,
             maximize_window,
             close_window,
-            changes
+            changes,
+            get_note,
+            get_notes
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -105,6 +143,10 @@ pub async fn run() {
                             if shortcut == &alt_m_shortcut {
                                 match event.state() {
                                     ShortcutState::Released => {
+                                        if let Some(mainWindow) = _app.get_webview_window("main") {
+                                            mainWindow.close().unwrap();
+                                        }
+
                                         let webview_window = tauri::WebviewWindowBuilder::new(
                                             _app,
                                             "search",

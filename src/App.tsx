@@ -9,6 +9,7 @@ function App() {
       <Titlebar />
       <BrowserRouter>
         <Routes>
+          <Route path="/:id" element={<NoteEditor />} />
           <Route path="/" element={<NoteEditor />} />
           <Route path="/search" element={<NoteOverview />} />
         </Routes>

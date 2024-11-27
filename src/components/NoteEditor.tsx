@@ -1,18 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Dot, Save } from "lucide-react";
 import React from "react";
+import { useParams } from "react-router-dom";
 import { useDebouncedCallback } from "use-debounce";
+import { Note } from "../models/Note";
 
-export type Note = {
-    id: string | undefined;
-    title: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-}
 
 export default function NoteEditor() {
-
     const ref = React.useRef<HTMLTextAreaElement>(null);
     const [changes, setChanges] = React.useState(false);
     const [content, setContent] = React.useState<Note>({
@@ -23,6 +17,20 @@ export default function NoteEditor() {
         updated_at: ""
     })
 
+    const { id } = useParams();
+
+    React.useEffect(() => {
+        if (id) {
+            console.log("loading ntoe");
+
+            invoke("get_note", { id: id }).then((note) => {
+                console.log(note);
+
+                setContent(note as Note);
+            });
+        }
+    }, [id]);
+
     React.useEffect(() => {
         if (ref.current) {
             ref.current.focus();
@@ -30,28 +38,25 @@ export default function NoteEditor() {
     }, []);
 
     const debounced = useDebouncedCallback(
-        // function
         (value: Note) => {
-            setChanges(false);
-            console.log("updating to backend");
+            console.log(value.content);
 
+            setChanges(false);
             invoke("changes", { data: value }).then((update) => {
                 console.log(update);
-
                 setContent(update as Note);
             })
         },
-        // delay in ms
         300
     );
 
     const textChanged = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setChanges(true);
-        debounced({
-            ...content,
-            title: e.target.value
-        });
         setContent({
+            ...content,
+            content: e.target.value
+        });
+        debounced({
             ...content,
             content: e.target.value
         });
