@@ -81,18 +81,34 @@ pub async fn run() {
                 use tauri_plugin_global_shortcut::{
                     Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
                 };
-                let ctrl_n_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::KeyN);
+                let alt_n_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::KeyN);
+                let alt_m_shortcut = Shortcut::new(Some(Modifiers::ALT), Code::KeyM);
                 app.handle().plugin(
                     tauri_plugin_global_shortcut::Builder::new()
                         .with_handler(move |_app, shortcut, event| {
                             println!("{:?}", shortcut);
-                            if shortcut == &ctrl_n_shortcut {
+                            if shortcut == &alt_n_shortcut {
                                 match event.state() {
                                     ShortcutState::Released => {
                                         let webview_window = tauri::WebviewWindowBuilder::new(
                                             _app,
                                             "main",
-                                            tauri::WebviewUrl::App("index.html".into()),
+                                            tauri::WebviewUrl::App("/".into()),
+                                        )
+                                        .decorations(false)
+                                        .build();
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            if shortcut == &alt_m_shortcut {
+                                match event.state() {
+                                    ShortcutState::Released => {
+                                        let webview_window = tauri::WebviewWindowBuilder::new(
+                                            _app,
+                                            "search",
+                                            tauri::WebviewUrl::App("/search".into()),
                                         )
                                         .decorations(false)
                                         .build();
@@ -104,7 +120,8 @@ pub async fn run() {
                         .build(),
                 )?;
 
-                app.global_shortcut().register(ctrl_n_shortcut)?;
+                app.global_shortcut().register(alt_n_shortcut)?;
+                app.global_shortcut().register(alt_m_shortcut)?;
             }
             let tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())

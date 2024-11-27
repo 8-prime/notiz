@@ -1,21 +1,18 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import Titlebar from "./components/titlebar";
+import Titlebar from "./components/Titlebar";
 import NoteEditor from "./components/NoteEditor";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import NoteOverview from "./components/NoteOverview";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
   return (
     <main className="flex flex-col items-center justify-start h-screen w-screen">
       <Titlebar />
-      <NoteEditor />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<NoteEditor />} />
+          <Route path="/search" element={<NoteOverview />} />
+        </Routes>
+      </BrowserRouter>
     </main>
   );
 }
