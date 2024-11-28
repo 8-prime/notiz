@@ -21,11 +21,7 @@ export default function NoteEditor() {
 
     React.useEffect(() => {
         if (id) {
-            console.log("loading ntoe");
-
             invoke("get_note", { id: id }).then((note) => {
-                console.log(note);
-
                 setContent(note as Note);
             });
         }

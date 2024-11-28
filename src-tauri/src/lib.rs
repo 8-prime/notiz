@@ -3,7 +3,6 @@
 use database::{DatabaseUuid, Note};
 use tauri::{tray::TrayIconBuilder, Manager, State, Window};
 use tokio::sync::Mutex;
-use uuid::{uuid, Uuid};
 
 mod database;
 
@@ -20,6 +19,32 @@ fn maximize_window(window: Window) {
 #[tauri::command]
 fn close_window(window: Window) {
     window.close().unwrap();
+}
+
+// #[tauri::command]
+// fn open_article(id: DatabaseUuid, handle: tauri::AppHandle) {
+//     // if let Some(mainWindow) = app.get_webview_window("search") {
+//     //     mainWindow.close().unwrap();
+//     // }
+//     let webview_window =
+//         tauri::WebviewWindowBuilder::new(&handle, "dd", tauri::WebviewUrl::App("/search".into()))
+//             .decorations(false)
+//             .build();
+//     println!("open_article called with id: {:?}", id);
+// }
+
+#[tauri::command]
+async fn open_article(id: DatabaseUuid, handle: tauri::AppHandle) -> Result<(), String> {
+    tauri::WebviewWindowBuilder::new(
+        &handle,
+        "main",
+        tauri::WebviewUrl::App(format!("/{}", id).into()),
+    )
+    .decorations(false)
+    .title("main")
+    .build()
+    .map_err(|err| err.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -81,7 +106,7 @@ async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<Note, 
         .ok_or_else(|| "Note not found".to_string())?;
     rw.update(old_note, data.clone())
         .map_err(|err| err.to_string())?;
-    rw.commit().map_err(|err| {
+    rw.commit().map_err(|_| {
         "Failed to update article: Could not commit transaction ({err})".to_string()
     })?;
 
@@ -102,7 +127,8 @@ pub async fn run() {
             close_window,
             changes,
             get_note,
-            get_notes
+            get_notes,
+            open_article
         ])
         .setup(|app| {
             let handle = app.handle().clone();

@@ -14,6 +14,11 @@ export default function NoteOverview() {
     }, []);
 
 
+    const openArticle = (id: string | undefined) => {
+        if (!id) return;
+        invoke("open_article", { id: id })
+    }
+
     return (
         <div className="w-full h-full flex flex-col items-center justify-start">
             <h1 className="text-3xl font-bold">Notiz</h1>
@@ -21,9 +26,9 @@ export default function NoteOverview() {
                 {notes.map((note) => {
                     return (
                         <div key={note.id} className="w-full h-full flex flex-col items-center justify-start">
-                            <a href={`/${note.id}`}>
+                            <button onClick={() => openArticle(note.id)} className="w-full h-full flex flex-col items-center justify-start">
                                 <h1 className="text-xl font-bold">{note.content.substring(0, 20)}</h1>
-                            </a>
+                            </button>
                         </div>
                     );
                 })}
