@@ -44,6 +44,11 @@ async fn open_article(id: DatabaseUuid, handle: tauri::AppHandle) -> Result<(), 
     .title("main")
     .build()
     .map_err(|err| err.to_string())?;
+
+    if let Some(search_window) = handle.get_webview_window("search") {
+        search_window.close().map_err(|err| err.to_string())?;
+    }
+
     Ok(())
 }
 
