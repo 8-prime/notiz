@@ -3,6 +3,7 @@
 use models::AppState;
 use tauri::{tray::TrayIconBuilder, Manager};
 use tokio::sync::Mutex;
+use windows::{close_main_window, open_main_window, open_search_window};
 
 mod commands;
 mod database;
@@ -46,13 +47,7 @@ pub async fn run() {
                             if shortcut == &alt_n_shortcut {
                                 match event.state() {
                                     ShortcutState::Released => {
-                                        let webview_window = tauri::WebviewWindowBuilder::new(
-                                            _app,
-                                            "main",
-                                            tauri::WebviewUrl::App("/".into()),
-                                        )
-                                        .decorations(false)
-                                        .build();
+                                        open_main_window(_app).unwrap();
                                     }
                                     _ => {}
                                 }
@@ -61,17 +56,8 @@ pub async fn run() {
                             if shortcut == &alt_m_shortcut {
                                 match event.state() {
                                     ShortcutState::Released => {
-                                        if let Some(mainWindow) = _app.get_webview_window("main") {
-                                            mainWindow.close().unwrap();
-                                        }
-
-                                        let webview_window = tauri::WebviewWindowBuilder::new(
-                                            _app,
-                                            "search",
-                                            tauri::WebviewUrl::App("/search".into()),
-                                        )
-                                        .decorations(false)
-                                        .build();
+                                        close_main_window(_app);
+                                        open_search_window(_app);
                                     }
                                     _ => {}
                                 }
