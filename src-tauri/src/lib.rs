@@ -1,139 +1,26 @@
 #![feature(iterator_try_collect)]
 
-use database::{DatabaseUuid, Note};
-use tauri::{tray::TrayIconBuilder, Manager, State, Window};
+use models::AppState;
+use tauri::{tray::TrayIconBuilder, Manager};
 use tokio::sync::Mutex;
 
+mod commands;
 mod database;
-
-#[tauri::command]
-fn minimize_window(window: Window) {
-    window.minimize().unwrap();
-}
-
-#[tauri::command]
-fn maximize_window(window: Window) {
-    window.maximize().unwrap();
-}
-
-#[tauri::command]
-fn close_window(window: Window) {
-    window.close().unwrap();
-}
-
-// #[tauri::command]
-// fn open_article(id: DatabaseUuid, handle: tauri::AppHandle) {
-//     // if let Some(mainWindow) = app.get_webview_window("search") {
-//     //     mainWindow.close().unwrap();
-//     // }
-//     let webview_window =
-//         tauri::WebviewWindowBuilder::new(&handle, "dd", tauri::WebviewUrl::App("/search".into()))
-//             .decorations(false)
-//             .build();
-//     println!("open_article called with id: {:?}", id);
-// }
-
-#[tauri::command]
-async fn open_article(id: DatabaseUuid, handle: tauri::AppHandle) -> Result<(), String> {
-    tauri::WebviewWindowBuilder::new(
-        &handle,
-        "main",
-        tauri::WebviewUrl::App(format!("/{}", id).into()),
-    )
-    .decorations(false)
-    .title("main")
-    .build()
-    .map_err(|err| err.to_string())?;
-
-    if let Some(search_window) = handle.get_webview_window("search") {
-        search_window.close().map_err(|err| err.to_string())?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_note(
-    id: Option<DatabaseUuid>,
-    state: State<'_, Mutex<AppState>>,
-) -> Result<Note, String> {
-    let state = state.lock().await;
-    let r = state.db.r_transaction().map_err(|err| err.to_string())?;
-    println!("get_note called with id: {:?}", id);
-    let note = r
-        .get()
-        .primary::<Note>(id)
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| "Note not found".to_string())?;
-    print!("{:?}", note);
-    Ok(note)
-}
-
-#[tauri::command]
-async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, String> {
-    let state = state.lock().await;
-    let r = state.db.r_transaction().map_err(|err| err.to_string())?;
-
-    let notes = r
-        .scan()
-        .primary::<Note>()
-        .map_err(|err| err.to_string())?
-        .all()
-        .map_err(|err| err.to_string())?
-        .try_collect::<Vec<Note>>()
-        .map_err(|err| err.to_string())?;
-    Ok(notes)
-}
-
-#[tauri::command]
-async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<Note, String> {
-    let state = state.lock().await;
-    let rw = state.db.rw_transaction().map_err(|err| err.to_string())?;
-
-    if data.id.is_none() {
-        println!("Changes called with new note");
-        let note = Note {
-            id: Some(DatabaseUuid::new()),
-            ..data
-        };
-        rw.insert(note.clone()).map_err(|err| err.to_string())?;
-        rw.commit().map_err(|err| {
-            "Failed to update article: Could not commit transaction ({err})".to_string()
-        })?;
-        return Ok(note);
-    }
-    println!("Changes called with existing note");
-
-    let old_note = rw
-        .get()
-        .primary::<Note>(data.id)
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| "Note not found".to_string())?;
-    rw.update(old_note, data.clone())
-        .map_err(|err| err.to_string())?;
-    rw.commit().map_err(|_| {
-        "Failed to update article: Could not commit transaction ({err})".to_string()
-    })?;
-
-    Ok(data)
-}
-
-struct AppState {
-    db: native_db::Database<'static>,
-}
+mod models;
+mod windows;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            minimize_window,
-            maximize_window,
-            close_window,
-            changes,
-            get_note,
-            get_notes,
-            open_article
+            commands::minimize_window,
+            commands::maximize_window,
+            commands::close_window,
+            commands::changes,
+            commands::get_note,
+            commands::get_notes,
+            commands::open_article
         ])
         .setup(|app| {
             let handle = app.handle().clone();
