@@ -1,4 +1,4 @@
-use tauri::Manager;
+use tauri::{window, Manager};
 
 use crate::database::DatabaseUuid;
 
@@ -16,32 +16,43 @@ pub fn close_main_window(handle: &tauri::AppHandle) -> Result<(), String> {
 }
 
 pub fn open_main_window(handle: &tauri::AppHandle) -> Result<(), String> {
-    tauri::WebviewWindowBuilder::new(handle, "main", tauri::WebviewUrl::App("/".into()))
-        .decorations(false)
-        .title("main")
-        .build()
-        .map_err(|err| err.to_string())?;
+    let window =
+        tauri::WebviewWindowBuilder::new(handle, "main", tauri::WebviewUrl::App("/".into()))
+            .decorations(false)
+            .title("main")
+            .inner_size(600.0, 400.0)
+            .build()
+            .map_err(|err| err.to_string())?;
+    window.show().map_err(|err| err.to_string())?;
     Ok(())
 }
 
 pub fn open_main_window_with_id(handle: &tauri::AppHandle, id: DatabaseUuid) -> Result<(), String> {
-    tauri::WebviewWindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         handle,
         "main",
         tauri::WebviewUrl::App(format!("/{}", id).into()),
     )
     .decorations(false)
     .title("main")
+    .inner_size(600.0, 400.0)
     .build()
     .map_err(|err| err.to_string())?;
+    window.show().map_err(|err| err.to_string())?;
     Ok(())
 }
 
 pub fn open_search_window(handle: &tauri::AppHandle) -> Result<(), String> {
-    tauri::WebviewWindowBuilder::new(handle, "search", tauri::WebviewUrl::App("/search".into()))
-        .decorations(false)
-        .title("search")
-        .build()
-        .map_err(|err| err.to_string())?;
+    let window = tauri::WebviewWindowBuilder::new(
+        handle,
+        "search",
+        tauri::WebviewUrl::App("/search".into()),
+    )
+    .decorations(false)
+    .title("search")
+    .inner_size(360.0, 600.0)
+    .build()
+    .map_err(|err| err.to_string())?;
+    window.show().map_err(|err| err.to_string())?;
     Ok(())
 }
