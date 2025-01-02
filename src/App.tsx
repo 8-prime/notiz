@@ -5,7 +5,7 @@ import NoteOverview from "./components/NoteOverview";
 
 function App() {
   return (
-    <main className="flex flex-col items-center justify-start h-screen w-screen">
+    <main className="flex flex-col items-center justify-start h-screen w-screen  bg-neutral-950">
       <Titlebar />
       <BrowserRouter>
         <Routes>

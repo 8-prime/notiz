@@ -21,6 +21,8 @@ pub fn open_main_window(handle: &tauri::AppHandle) -> Result<(), String> {
             .decorations(false)
             .title("main")
             .inner_size(600.0, 400.0)
+            .focused(true)
+            .center()
             .build()
             .map_err(|err| err.to_string())?;
     window.show().map_err(|err| err.to_string())?;
@@ -36,6 +38,9 @@ pub fn open_main_window_with_id(handle: &tauri::AppHandle, id: DatabaseUuid) -> 
     .decorations(false)
     .title("main")
     .inner_size(600.0, 400.0)
+    .focused(true)
+    .center()
+    .transparent(true)
     .build()
     .map_err(|err| err.to_string())?;
     window.show().map_err(|err| err.to_string())?;
@@ -51,6 +56,9 @@ pub fn open_search_window(handle: &tauri::AppHandle) -> Result<(), String> {
     .decorations(false)
     .title("search")
     .inner_size(360.0, 600.0)
+    .focused(true)
+    .center()
+    .transparent(true)
     .build()
     .map_err(|err| err.to_string())?;
     window.show().map_err(|err| err.to_string())?;

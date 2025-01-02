@@ -47,7 +47,9 @@ pub async fn run() {
                             if shortcut == &alt_n_shortcut {
                                 match event.state() {
                                     ShortcutState::Released => {
-                                        open_main_window(_app).unwrap();
+                                        if let None = _app.get_webview_window("main") {
+                                            open_main_window(_app).unwrap();
+                                        }
                                     }
                                     _ => {}
                                 }
