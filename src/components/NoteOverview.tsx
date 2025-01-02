@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Note } from "../models/Note";
 import { Star, Trash2 } from "lucide-react";
 import { useDebouncedCallback } from "use-debounce";
@@ -61,11 +61,17 @@ export default function NoteOverview() {
     const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
     const [selected, setSelected] = useState<number>(0);
 
+    const ref = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         invoke("get_notes").then((result) => {
             setNotes(result as Note[]);
             setFilteredNotes(result as Note[]);
         });
+
+        if (ref.current) {
+            ref.current.focus();
+        }
     }, []);
 
     const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -76,10 +82,14 @@ export default function NoteOverview() {
             event.preventDefault();
             setSelected((selected + filteredNotes.length + 1) % filteredNotes.length)
         }
+        if (event.key === 'Enter') {
+            invoke("open_article", { id: filteredNotes[selected].id })
+        }
     };
 
     const debounced = useDebouncedCallback(
         (search: string) => {
+            setSelected(0);
             if (search.length === 0) {
                 setFilteredNotes(notes);
             }
@@ -97,7 +107,7 @@ export default function NoteOverview() {
     return (
         <div className="w-full h-full grid grid-rows-[auto_auto_1fr] gap-3 text-neutral-100 overflow-hidden">
             <div className="px-8">
-                <input onChange={textChanged} onKeyDown={handleKeyDown} className="w-full bg-neutral-950 border-b-2 border-neutral-100 active:outline-none focus:outline-none" type="text" placeholder="Search ..." />
+                <input ref={ref} onChange={textChanged} onKeyDown={handleKeyDown} className="w-full bg-neutral-950 border-b-2 border-neutral-100 active:outline-none focus:outline-none" type="text" placeholder="Search ..." />
             </div>
             <div className="w-full flex justify-start items-center px-8">
                 <h1 className="text-xl font-bold">Notiz</h1>
