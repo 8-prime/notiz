@@ -85,6 +85,10 @@ export default function NoteOverview() {
         if (event.key === 'Enter') {
             invoke("open_article", { id: filteredNotes[selected].id })
         }
+        if (event.ctrlKey && event.key === 'w') {
+            event.preventDefault();
+            invoke('close_window');
+        }
     };
 
     const debounced = useDebouncedCallback(

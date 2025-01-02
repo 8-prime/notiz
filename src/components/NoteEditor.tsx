@@ -29,19 +29,14 @@ export default function NoteEditor() {
 
     React.useEffect(() => {
         if (ref.current) {
-            console.log("set focus on ref");
-
             ref.current.focus();
         }
     }, []);
 
     const debounced = useDebouncedCallback(
         (value: Note) => {
-            console.log(value.content);
-
             setChanges(false);
             invoke("changes", { data: value }).then((update) => {
-                console.log(update);
                 setContent(update as Note);
             })
         },
@@ -60,6 +55,17 @@ export default function NoteEditor() {
         });
     }
 
+    const onKeyDown = (event: React.KeyboardEvent) => {
+        if (event.ctrlKey && event.key === 'w') {
+            event.preventDefault();
+            setChanges(false);
+            invoke("changes", { data: content }).then((update) => {
+                setContent(update as Note);
+                invoke('close_window');
+            })
+        }
+    }
+
     return (
         <div className="grow flex flex-col items-center justify-start w-full px-4 pb-4">
             <div className="w-full h-full overflow-hidden">
@@ -68,6 +74,7 @@ export default function NoteEditor() {
                     ref={ref}
                     value={content.content}
                     onChange={textChanged}
+                    onKeyDown={onKeyDown}
                 />
             </div>
             <div className="w-full flex justify-end items-center">
