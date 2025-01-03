@@ -19,7 +19,7 @@ function ArticleTitle({ note }: Readonly<{ note: Note }>) {
     )
 }
 
-function ArticleInfo({ note, selected, onDelete }: Readonly<{ note: Note, selected: string | undefined, onDelete: (id: string | undefined) => void }>) {
+function ArticleInfo({ note, selected, onDelete, onFavorite }: Readonly<{ note: Note, selected: string | undefined, onDelete: (id: string | undefined) => void, onFavorite: (note: Note) => void }>) {
     const [showDelete, setShowDelete] = useState<boolean>(false);
     const openArticle = (id: string | undefined) => {
         if (!id) return;
@@ -40,8 +40,8 @@ function ArticleInfo({ note, selected, onDelete }: Readonly<{ note: Note, select
                 {
                     !showDelete &&
                     <>
-                        <button>
-                            <Star color="#7a7a7a" />
+                        <button onClick={() => onFavorite(note)}>
+                            <Star fill={note.favorite ? '#7a7a7a' : 'none'} color="#7a7a7a" />
                         </button>
                         <button onClick={() => setShowDelete(true)}>
                             <Trash2 color="#7a7a7a" />
@@ -51,7 +51,7 @@ function ArticleInfo({ note, selected, onDelete }: Readonly<{ note: Note, select
             </div>
             {
                 showDelete &&
-                <div className="col-start-1 row-start-1 z-10 flex justify-end items-center gap-1 bg-neutral-700">
+                <div className="col-start-1 row-start-1 z-10 flex justify-end items-center gap-1 bg-neutral-800 hover:bg-neutral-700">
                     <button className="grow flex flex-row justify-start items-center" onClick={() => setShowDelete(false)}><p>Delete item?</p></button>
                     <button className="rounded-lg px-2 py-1 bg-black text-neutral-100" onClick={() => handleDelete()}>Yes</button>
                     <button className="rounded-lg px-2 py-1 bg-black text-neutral-100" onClick={() => setShowDelete(false)}>No</button>
@@ -65,6 +65,7 @@ export default function NoteOverview() {
     const [notes, setNotes] = useState<Note[]>([]);
     const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
     const [selected, setSelected] = useState<number>(0);
+    const [search, setSearch] = useState<string>('');
 
     const ref = useRef<HTMLInputElement>(null);
 
@@ -72,6 +73,8 @@ export default function NoteOverview() {
         invoke("get_notes").then((result) => {
             setNotes(result as Note[]);
             setFilteredNotes(result as Note[]);
+        }).catch((err) => {
+            console.error(err)
         });
 
         if (ref.current) {
@@ -96,28 +99,55 @@ export default function NoteOverview() {
         }
     };
 
+    const updateSearch = (search: string, notes: Note[]) => {
+        setSelected(0);
+        if (search.length === 0) {
+            setFilteredNotes(notes);
+        }
+        else {
+            setSearch(search);
+            setFilteredNotes(notes.filter(n => n.content.substring(0, 20).toLocaleLowerCase().includes(search)))
+        }
+    }
+
+
     const debounced = useDebouncedCallback(
-        (search: string) => {
-            setSelected(0);
-            if (search.length === 0) {
-                setFilteredNotes(notes);
-            }
-            else {
-                setFilteredNotes(notes.filter(n => n.content.substring(0, 20).toLocaleLowerCase().includes(search)))
-            }
+        (search: string, notes: Note[]) => {
+            updateSearch(search, notes)
         },
         300
     );
 
     const textChanged = (e: React.ChangeEvent<HTMLInputElement>) => {
-        debounced(e.target.value);
+        debounced(e.target.value, notes);
     }
 
     const onDelete = (id: string | undefined) => {
         if (!id) {
             return;
         }
-        console.log("deleting item");
+        invoke("delete_note", { id: id })
+            .then(() => {
+                console.log("done deleting note");
+                return invoke("get_notes")
+            })
+            .then((result) => {
+                setNotes(result as Note[]);
+                updateSearch(search, result as Note[])
+            })
+    }
+
+    const onFavorite = (note: Note) => {
+        note.favorite = !note.favorite
+        invoke("changes", { data: note })
+            .then(() => {
+                console.log("done saving favorite");
+                return invoke("get_notes")
+            })
+            .then((result) => {
+                setNotes(result as Note[]);
+                updateSearch(search, result as Note[])
+            })
     }
 
     return (
@@ -130,7 +160,7 @@ export default function NoteOverview() {
             </div>
             <div className="w-full overflow-y-auto px-8">
                 {filteredNotes.map((note) =>
-                    <ArticleInfo key={note.id} note={note} selected={filteredNotes[selected].id} onDelete={onDelete}></ArticleInfo>
+                    <ArticleInfo key={note.id} note={note} selected={filteredNotes[selected].id} onDelete={onDelete} onFavorite={onFavorite}></ArticleInfo>
                 )}
             </div>
         </div>

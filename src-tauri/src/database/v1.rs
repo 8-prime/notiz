@@ -21,4 +21,5 @@ pub struct Note {
     pub content: String,
     pub created_at: String,
     pub updated_at: String,
+    pub favorite: bool,
 }

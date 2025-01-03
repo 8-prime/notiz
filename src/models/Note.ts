@@ -4,4 +4,5 @@ export type Note = {
     content: string;
     created_at: string;
     updated_at: string;
+    favorite: boolean;
 }

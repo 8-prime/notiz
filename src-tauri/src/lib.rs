@@ -21,7 +21,8 @@ pub async fn run() {
             commands::changes,
             commands::get_note,
             commands::get_notes,
-            commands::open_article
+            commands::open_article,
+            commands::delete_note
         ])
         .setup(|app| {
             let handle = app.handle().clone();

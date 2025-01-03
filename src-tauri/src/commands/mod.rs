@@ -49,7 +49,7 @@ pub async fn get_note(
 pub async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, String> {
     let state = state.lock().await;
     let r = state.db.r_transaction().map_err(|err| err.to_string())?;
-
+    println!("creating read transaction");
     let notes = r
         .scan()
         .primary::<Note>()
@@ -58,6 +58,7 @@ pub async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, S
         .map_err(|err| err.to_string())?
         .try_collect::<Vec<Note>>()
         .map_err(|err| err.to_string())?;
+    print!("done reading data");
     Ok(notes)
 }
 
@@ -91,4 +92,22 @@ pub async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<No
     })?;
 
     Ok(data)
+}
+
+#[tauri::command]
+pub async fn delete_note(
+    id: Option<DatabaseUuid>,
+    state: State<'_, Mutex<AppState>>,
+) -> Result<(), String> {
+    let state = state.lock().await;
+    let rw = state.db.rw_transaction().map_err(|err| err.to_string())?;
+
+    let old_note = rw
+        .get()
+        .primary::<Note>(id)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| "Note not found".to_string())?;
+    rw.remove(old_note).map_err(|err| err.to_string())?;
+    rw.commit().map_err(|_| "Failed to remove article")?;
+    Ok(())
 }

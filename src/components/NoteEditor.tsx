@@ -14,7 +14,8 @@ export default function NoteEditor() {
         title: "",
         content: "",
         created_at: "",
-        updated_at: ""
+        updated_at: "",
+        favorite: false
     })
 
     const { id } = useParams();
@@ -37,6 +38,7 @@ export default function NoteEditor() {
         (value: Note) => {
             setChanges(false);
             invoke("changes", { data: value }).then((update) => {
+                console.log(update);
                 setContent(update as Note);
             })
         },
