@@ -19,11 +19,16 @@ function ArticleTitle({ note }: Readonly<{ note: Note }>) {
     )
 }
 
-function ArticleInfo({ note, selected }: Readonly<{ note: Note, selected: string | undefined }>) {
+function ArticleInfo({ note, selected, onDelete }: Readonly<{ note: Note, selected: string | undefined, onDelete: (id: string | undefined) => void }>) {
     const [showDelete, setShowDelete] = useState<boolean>(false);
     const openArticle = (id: string | undefined) => {
         if (!id) return;
         invoke("open_article", { id: id })
+    }
+
+    const handleDelete = () => {
+        setShowDelete(false);
+        onDelete(note.id);
     }
 
     return (
@@ -46,9 +51,9 @@ function ArticleInfo({ note, selected }: Readonly<{ note: Note, selected: string
             </div>
             {
                 showDelete &&
-                <div className="col-start-1 row-start-1 z-10 flex justify-end items-center gap-1">
-                    <button className="grow" onClick={() => setShowDelete(false)}></button>
-                    <button className="rounded-lg px-2 py-1 bg-black text-neutral-100" onClick={() => setShowDelete(false)}>Yes</button>
+                <div className="col-start-1 row-start-1 z-10 flex justify-end items-center gap-1 bg-neutral-700">
+                    <button className="grow flex flex-row justify-start items-center" onClick={() => setShowDelete(false)}><p>Delete item?</p></button>
+                    <button className="rounded-lg px-2 py-1 bg-black text-neutral-100" onClick={() => handleDelete()}>Yes</button>
                     <button className="rounded-lg px-2 py-1 bg-black text-neutral-100" onClick={() => setShowDelete(false)}>No</button>
                 </div>
             }
@@ -108,6 +113,13 @@ export default function NoteOverview() {
         debounced(e.target.value);
     }
 
+    const onDelete = (id: string | undefined) => {
+        if (!id) {
+            return;
+        }
+        console.log("deleting item");
+    }
+
     return (
         <div className="w-full h-full grid grid-rows-[auto_auto_1fr] gap-3 text-neutral-100 overflow-hidden">
             <div className="px-8">
@@ -118,7 +130,7 @@ export default function NoteOverview() {
             </div>
             <div className="w-full overflow-y-auto px-8">
                 {filteredNotes.map((note) =>
-                    <ArticleInfo key={note.id} note={note} selected={filteredNotes[selected].id}></ArticleInfo>
+                    <ArticleInfo key={note.id} note={note} selected={filteredNotes[selected].id} onDelete={onDelete}></ArticleInfo>
                 )}
             </div>
         </div>
