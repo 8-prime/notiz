@@ -1,7 +1,11 @@
 #![feature(iterator_try_collect)]
 
 use models::AppState;
-use tauri::{tray::TrayIconBuilder, Manager};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    Manager,
+};
 use tokio::sync::Mutex;
 use windows::{close_main_window, open_main_window, open_search_window};
 
@@ -72,21 +76,21 @@ pub async fn run() {
                 app.global_shortcut().register(alt_n_shortcut)?;
                 app.global_shortcut().register(alt_m_shortcut)?;
             }
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&quit_i])?;
+
             let tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .on_tray_icon_event(|tray, event| match event {
-                    tauri::tray::TrayIconEvent::Click { .. } => {
-                        println!("left click pressed and released");
-                        let app = tray.app_handle();
-                        let webview_window = tauri::WebviewWindowBuilder::new(
-                            app,
-                            "main",
-                            tauri::WebviewUrl::App("index.html".into()),
-                        )
-                        .decorations(false)
-                        .build();
+                .menu(&menu)
+                .menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        println!("quit menu item was clicked");
+                        app.exit(20);
                     }
-                    _ => {}
+                    _ => {
+                        println!("menu item {:?} not handled", event.id);
+                    }
                 })
                 .build(app)?;
 
@@ -95,8 +99,14 @@ pub async fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|_app_handle, event| match event {
-            tauri::RunEvent::ExitRequested { api, .. } => {
-                api.prevent_exit();
+            tauri::RunEvent::ExitRequested { api, code, .. } => {
+                if let Some(c) = code {
+                    if c != 20 {
+                        api.prevent_exit();
+                    }
+                } else {
+                    api.prevent_exit();
+                }
             }
             _ => {}
         });
