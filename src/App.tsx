@@ -12,7 +12,7 @@ function App() {
   }, [])
 
   return (
-    <main className="flex flex-col items-center justify-start h-screen w-screen  bg-neutral-950">
+    <main className="grid grid-rows-[auto_1fr] h-screen w-screen  bg-neutral-950">
       <Titlebar />
       <BrowserRouter>
         <Routes>

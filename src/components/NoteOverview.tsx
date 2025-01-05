@@ -4,21 +4,6 @@ import { Note } from "../models/Note";
 import { Star, Trash2 } from "lucide-react";
 import { useDebouncedCallback } from "use-debounce";
 
-function ArticleTitle({ note }: Readonly<{ note: Note }>) {
-    const title = note.content.substring(0, 20);
-    return (
-        <>
-            {title.length === 0 &&
-                <p className="italic text-lg">No title</p>
-            }
-            {
-                title.length > 0 &&
-                <p className="text-lg font-medium">{title}</p>
-            }
-        </>
-    )
-}
-
 function ArticleInfo({ note, selected, onDelete, onFavorite }: Readonly<{ note: Note, selected: string | undefined, onDelete: (id: string | undefined) => void, onFavorite: (note: Note) => void }>) {
     const [showDelete, setShowDelete] = useState<boolean>(false);
     const openArticle = (id: string | undefined) => {
@@ -35,7 +20,11 @@ function ArticleInfo({ note, selected, onDelete, onFavorite }: Readonly<{ note: 
         <div className={`grid grid-rows-1 grid-cols-1 h-12  hover:bg-neutral-700 rounded-lg p-2 ${selected === note.id ? 'bg-neutral-800' : ''}`}>
             <div className="col-start-1 row-start-1 flex flex-row items-center justify-start gap-2">
                 <button onClick={() => openArticle(note.id)} className="grow h-full flex items-center justify-start">
-                    <ArticleTitle note={note}></ArticleTitle>
+                    {note.title.length > 0 ?
+                        <p>{note.title}</p> :
+                        <p className="italic">No title</p>
+                    }
+
                 </button>
                 {
                     !showDelete &&
@@ -128,7 +117,6 @@ export default function NoteOverview() {
         }
         invoke("delete_note", { id: id })
             .then(() => {
-                console.log("done deleting note");
                 return invoke("get_notes")
             })
             .then((result) => {
@@ -141,7 +129,6 @@ export default function NoteOverview() {
         note.favorite = !note.favorite
         invoke("changes", { data: note })
             .then(() => {
-                console.log("done saving favorite");
                 return invoke("get_notes")
             })
             .then((result) => {

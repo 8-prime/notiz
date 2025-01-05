@@ -4,6 +4,10 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import { useDebouncedCallback } from "use-debounce";
 import { Note } from "../models/Note";
+import RichEditor from "./Editor/RichEditor";
+import { Editor } from "@tiptap/react";
+import { getTitleFromText } from "../utils/utils";
+import { ContentMatch } from "@tiptap/pm/model";
 
 
 export default function NoteEditor() {
@@ -17,12 +21,12 @@ export default function NoteEditor() {
         updated_at: "",
         favorite: false
     })
-
     const { id } = useParams();
 
     React.useEffect(() => {
         if (id) {
             invoke("get_note", { id: id }).then((note) => {
+                console.log(note);
                 setContent(note as Note);
             });
         }
@@ -38,26 +42,26 @@ export default function NoteEditor() {
         (value: Note) => {
             setChanges(false);
             invoke("changes", { data: value }).then((update) => {
-                console.log(update);
                 setContent(update as Note);
             })
         },
         300
     );
 
-    const textChanged = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const textChanged = (editor: Editor) => {
         setChanges(true);
-        setContent({
+        const update = {
             ...content,
-            content: e.target.value
-        });
-        debounced({
-            ...content,
-            content: e.target.value
-        });
+            content: editor.getHTML(),
+            title: getTitleFromText(editor.getText()),
+            updated_at: new Date().toDateString()
+        }
+
+        setContent(update)
+        debounced(update);
     }
 
-    const onKeyDown = (event: React.KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
         if (event.ctrlKey && event.key === 'w') {
             event.preventDefault();
             setChanges(false);
@@ -69,8 +73,9 @@ export default function NoteEditor() {
     }
 
     return (
-        <div className="grow flex flex-col items-center justify-start w-full px-4 pb-4">
-            <div className="w-full h-full overflow-hidden">
+        <div className="h-full grid grid-rows-[1fr_auto] w-full gap-2 px-4 pb-4 overflow-hidden">
+            <RichEditor note={content.content} onChanges={textChanged} onKeyDown={onKeyDown}></RichEditor>
+            {/* <div className="w-full h-full">
                 <textarea
                     className="w-full h-full px-4 text-sm text-neutral-100 bg-neutral-950 rounded-lg  focus:outline-none resize-none"
                     ref={ref}
@@ -78,7 +83,7 @@ export default function NoteEditor() {
                     onChange={textChanged}
                     onKeyDown={onKeyDown}
                 />
-            </div>
+            </div> */}
             <div className="w-full flex justify-end items-center">
                 {changes && <Dot strokeWidth={1} color="#7a7a7a" />}
                 {!changes && <Save strokeWidth={1} color="#7a7a7a" />}

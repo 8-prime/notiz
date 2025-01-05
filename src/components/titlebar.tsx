@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { X } from "lucide-react";
+import { Minus, X } from "lucide-react";
 
 export default function Titlebar() {
 
