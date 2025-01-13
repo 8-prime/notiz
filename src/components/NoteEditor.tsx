@@ -7,7 +7,6 @@ import { Note } from "../models/Note";
 import RichEditor from "./Editor/RichEditor";
 import { Editor } from "@tiptap/react";
 import { getTitleFromText } from "../utils/utils";
-import { ContentMatch } from "@tiptap/pm/model";
 
 
 export default function NoteEditor() {

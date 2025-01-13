@@ -16,7 +16,7 @@ export default ({ note, onChanges, onKeyDown }: { note: string, onChanges: (data
         ],
         content: note,
         editorProps: {
-            handleKeyDown: (view, event: KeyboardEvent) => {
+            handleKeyDown: (_, event: KeyboardEvent) => {
                 onKeyDown(event)
             },
             attributes: {

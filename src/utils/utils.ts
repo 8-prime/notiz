@@ -1,6 +1,7 @@
 export default async function setupAppWindow() {
     const appWindow = (await import('@tauri-apps/api/window')).getCurrentWindow()
-    appWindow.show();
+    await appWindow.show();
+    await appWindow.setFocus()
 }
 
 export function getTitleFromText(text: string): string {
