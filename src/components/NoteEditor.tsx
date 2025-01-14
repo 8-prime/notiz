@@ -61,10 +61,14 @@ export default function NoteEditor() {
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+        console.log(event);
+
         if (event.ctrlKey && event.key === 'w') {
             event.preventDefault();
             setChanges(false);
             invoke("changes", { data: content }).then((update) => {
+                console.log("closing window now");
+
                 setContent(update as Note);
                 invoke('close_window');
             })
@@ -74,15 +78,6 @@ export default function NoteEditor() {
     return (
         <div className="h-full grid grid-rows-[1fr_auto] w-full gap-2 px-4 pb-4 overflow-hidden">
             <RichEditor note={content.content} onChanges={textChanged} onKeyDown={onKeyDown}></RichEditor>
-            {/* <div className="w-full h-full">
-                <textarea
-                    className="w-full h-full px-4 text-sm text-neutral-100 bg-neutral-950 rounded-lg  focus:outline-none resize-none"
-                    ref={ref}
-                    value={content.content}
-                    onChange={textChanged}
-                    onKeyDown={onKeyDown}
-                />
-            </div> */}
             <div className="w-full flex justify-end items-center">
                 {changes && <Dot strokeWidth={1} color="#7a7a7a" />}
                 {!changes && <Save strokeWidth={1} color="#7a7a7a" />}

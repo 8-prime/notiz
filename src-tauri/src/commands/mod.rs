@@ -66,6 +66,26 @@ pub async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, S
 pub async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<Note, String> {
     let state = state.lock().await;
     let rw = state.db.rw_transaction().map_err(|err| err.to_string())?;
+    if data.content.len() == 7 {
+        if data.id.is_some() {
+            let old_note = rw
+                .get()
+                .primary::<Note>(data.id)
+                .map_err(|err| err.to_string())?
+                .ok_or_else(|| "Note not found".to_string())?;
+            rw.remove(old_note).map_err(|err| err.to_string())?;
+            rw.commit().map_err(|_| "Failed to remove article")?;
+            return Ok(Note {
+                content: data.content,
+                id: None,
+                favorite: data.favorite,
+                created_at: data.created_at,
+                title: data.title,
+                updated_at: data.updated_at,
+            });
+        }
+        return Ok(data);
+    }
 
     if data.id.is_none() {
         let note = Note {
@@ -78,8 +98,6 @@ pub async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<No
         })?;
         return Ok(note);
     }
-    println!("Changes called with existing note");
-
     let old_note = rw
         .get()
         .primary::<Note>(data.id)
