@@ -20,7 +20,7 @@ export default ({ note, onChanges, onKeyDown }: { note: string, onChanges: (data
                 onKeyDown(event)
             },
             attributes: {
-                class: "bg-neutral-950 text-white w-full h-full p-1"
+                class: "bg-neutral-950 text-white w-full h-full p-1 outline-none active:outline-none focus:outline-none"
             }
         },
         onUpdate({ editor }) {
