@@ -66,7 +66,7 @@ pub async fn get_notes(state: State<'_, Mutex<AppState>>) -> Result<Vec<Note>, S
 pub async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<Note, String> {
     let state = state.lock().await;
     let rw = state.db.rw_transaction().map_err(|err| err.to_string())?;
-    if data.content.len() == 7 {
+    if data.content.len() <= 7 {
         if data.id.is_some() {
             let old_note = rw
                 .get()
@@ -86,7 +86,6 @@ pub async fn changes(data: Note, state: State<'_, Mutex<AppState>>) -> Result<No
         }
         return Ok(data);
     }
-
     if data.id.is_none() {
         let note = Note {
             id: Some(DatabaseUuid::new()),

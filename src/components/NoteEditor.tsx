@@ -16,7 +16,7 @@ export default function NoteEditor() {
         id: undefined,
         title: "",
         content: "",
-        created_at: "",
+        created_at: new Date().toISOString(),
         updated_at: "",
         favorite: false
     })
@@ -53,16 +53,13 @@ export default function NoteEditor() {
             ...content,
             content: editor.getHTML(),
             title: getTitleFromText(editor.getText()),
-            updated_at: new Date().toDateString()
+            updated_at: new Date().toISOString()
         }
-
         setContent(update)
         debounced(update);
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-        console.log(event);
-
         if (event.ctrlKey && event.key === 'w') {
             event.preventDefault();
             setChanges(false);

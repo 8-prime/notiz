@@ -17,13 +17,16 @@ function ArticleInfo({ note, selected, onDelete, onFavorite }: Readonly<{ note: 
     }
 
     return (
-        <div className={`grid grid-rows-1 grid-cols-1 h-12  hover:bg-neutral-700 rounded-lg p-2 ${selected === note.id ? 'bg-neutral-800' : ''}`}>
+        <div className={`grid grid-rows-1 grid-cols-1 h-14  hover:bg-neutral-700 rounded-lg p-2 ${selected === note.id ? 'bg-neutral-800' : ''}`}>
             <div className="col-start-1 row-start-1 flex flex-row items-center justify-start gap-2">
-                <button onClick={() => openArticle(note.id)} className="grow h-full flex items-center justify-start">
-                    {note.title.length > 0 ?
-                        <p>{note.title}</p> :
-                        <p className="italic">No title</p>
-                    }
+                <button onClick={() => openArticle(note.id)} className="grow h-full flex items-start justify-center flex-col">
+                    <p>
+                        {note.title.length > 0 ?
+                            <p>{note.title}</p> :
+                            <p className="italic">No title</p>
+                        }
+                    </p>
+                    <p className="text-xs text-neutral-400">Changed - {note.updated_at}</p>
 
                 </button>
                 {
@@ -72,6 +75,7 @@ export default function NoteOverview() {
     }, []);
 
     const handleKeyDown = (event: React.KeyboardEvent) => {
+        console.log("key");
         if (event.key === 'ArrowUp') {
             event.preventDefault();
             setSelected((selected + filteredNotes.length - 1) % filteredNotes.length)
@@ -143,13 +147,13 @@ export default function NoteOverview() {
                 <input ref={ref} onChange={textChanged} onKeyDown={handleKeyDown} className="w-full bg-neutral-950 border-b-2 border-neutral-100 active:outline-none focus:outline-none" type="text" placeholder="Search ..." />
             </div>
             <div className="w-full flex justify-start items-center px-8">
-                <h1 className="text-xl font-bold">Notiz</h1>
+                <h1 className="text-xl font-bold">Notes:</h1>
             </div>
-            <div className="w-full overflow-y-auto px-8">
+            <div className="w-full overflow-y-auto px-8 flex flex-col gap-2">
                 {filteredNotes.map((note) =>
                     <ArticleInfo key={note.id} note={note} selected={filteredNotes[selected].id} onDelete={onDelete} onFavorite={onFavorite}></ArticleInfo>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
