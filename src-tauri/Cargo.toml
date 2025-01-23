@@ -1,6 +1,6 @@
 [package]
 name = "notiz"
-version = "0.1.1"
+version = "0.1.2"
 description = "a no fuzz note app"
 authors = ["8-prime"]
 edition = "2021"
