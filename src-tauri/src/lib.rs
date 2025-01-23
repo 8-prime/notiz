@@ -6,6 +6,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tokio::sync::Mutex;
 use windows::{close_main_window, open_main_window, open_search_window};
 
@@ -17,6 +18,10 @@ mod windows;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             commands::minimize_window,
@@ -30,6 +35,11 @@ pub async fn run() {
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+
+            let autostart_manager = app.autolaunch();
+            if autostart_manager.is_enabled()? {
+                let _ = autostart_manager.enable();
+            }
 
             tauri::async_runtime::spawn(async move {
                 let binding = handle.path().app_data_dir().unwrap();

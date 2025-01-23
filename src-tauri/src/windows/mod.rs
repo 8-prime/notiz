@@ -24,6 +24,7 @@ pub fn open_main_window(handle: &tauri::AppHandle) -> Result<(), String> {
             .focused(true)
             .center()
             .visible(false)
+            .always_on_top(true)
             .build()
             .map_err(|err| err.to_string())?;
     // window.show().map_err(|err| err.to_string())?;
@@ -42,6 +43,7 @@ pub fn open_main_window_with_id(handle: &tauri::AppHandle, id: DatabaseUuid) -> 
     .focused(true)
     .center()
     .visible(false)
+    .always_on_top(true)
     .build()
     .map_err(|err| err.to_string())?;
     // window.show().map_err(|err| err.to_string())?;
@@ -60,6 +62,7 @@ pub fn open_search_window(handle: &tauri::AppHandle) -> Result<(), String> {
     .focused(true)
     .center()
     .visible(false)
+    .always_on_top(true)
     .build()
     .map_err(|err| err.to_string())?;
     // window.show().map_err(|err| err.to_string())?;

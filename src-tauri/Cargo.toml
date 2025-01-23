@@ -31,4 +31,5 @@ native_model = "0.4.20"
 tokio = { version = "1", features = ["full"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
