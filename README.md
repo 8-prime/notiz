@@ -12,14 +12,15 @@ cargo run
 
 The first launch creates `notes.sqlite3` in the operating system's local application data directory for Notiz. Set `NOTIZ_DATA_DIR` to use a different directory, for example when trying the rewrite without touching your usual notes.
 
-Search and the note editor are separate native windows. The editor opens as a small, plain text note with no toolbar; typing saves immediately. The first non-empty line becomes its title in the search window. Search always finds plain text matches.
+Notiz starts in the system tray with no window open. The tray menu can open a new note, open search, or quit the app. Search and the note editor are separate native windows with a dark theme. The editor opens as a small, plain text window with no toolbar; typing saves immediately. The first non-empty line becomes its title in the search window. Search always finds plain text matches.
 
 ## Keyboard
 
-- **Alt+N** creates a note and opens the note window, even when Notiz is in the background.
-- **Alt+M** brings the search window forward and focuses search.
-- **Ctrl+W** closes the focused window. Closing the search window exits Notiz; closing the note window leaves search open.
-- From search, **Down** moves into the note list. In the list, **Up/Down** selects notes, **Enter** opens the selected note, **Delete** removes it, and **Esc** returns to search.
+- **Ctrl+N** creates a note and opens only the note window, even when Notiz is in the background.
+- **Ctrl+M** opens the notes list with search focused.
+- **Alt+N** and **Alt+M** remain available as aliases for those actions.
+- **Ctrl+W** closes the focused window. Notiz remains in the tray; use its menu to quit.
+- From search, **Down/Up** moves into the note list at its first/last match. In the list, **Up/Down** selects notes, **Enter** opens the selected note, **Delete** removes it, and **Esc** returns to search.
 - **Ctrl+,** opens settings; **Esc** returns to notes.
 
 Global shortcuts depend on OS support and whether another app has already claimed them. If registration fails, the settings page shows the error and the shortcuts still work while Notiz is focused.

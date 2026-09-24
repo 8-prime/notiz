@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    error::Error as StdError,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -19,14 +20,15 @@ use tokio::runtime::Runtime;
 use crate::{
     semantic::{self, SearchUpdate},
     storage::{Note, Settings, Store},
+    tray::{Tray, TrayAction},
 };
 
-const INK: Color32 = Color32::from_rgb(29, 39, 53);
-const MUTED: Color32 = Color32::from_rgb(105, 115, 130);
-const PAPER: Color32 = Color32::from_rgb(249, 250, 252);
-const NOTE_PAPER: Color32 = Color32::from_rgb(255, 250, 222);
-const ACCENT: Color32 = Color32::from_rgb(53, 96, 143);
-const ERROR: Color32 = Color32::from_rgb(154, 60, 58);
+const INK: Color32 = Color32::from_rgb(231, 235, 240);
+const MUTED: Color32 = Color32::from_rgb(151, 160, 172);
+const PAPER: Color32 = Color32::from_rgb(26, 29, 34);
+const NOTE_PAPER: Color32 = Color32::from_rgb(31, 35, 41);
+const ACCENT: Color32 = Color32::from_rgb(56, 63, 73);
+const ERROR: Color32 = Color32::from_rgb(242, 135, 135);
 
 fn note_viewport_id() -> egui::ViewportId {
     egui::ViewportId::from_hash_of("notiz_note_editor")
@@ -51,6 +53,8 @@ struct Hotkeys {
     listener: Option<JoinHandle<()>>,
     new_registered: bool,
     search_registered: bool,
+    alt_new_registered: bool,
+    alt_search_registered: bool,
     error: Option<String>,
 }
 
@@ -65,50 +69,66 @@ impl Hotkeys {
                 None
             }
         };
-        let new_key = HotKey::new(Some(Modifiers::ALT), Code::KeyN);
-        let search_key = HotKey::new(Some(Modifiers::ALT), Code::KeyM);
+        let new_key = HotKey::new(Some(Modifiers::CONTROL), Code::KeyN);
+        let search_key = HotKey::new(Some(Modifiers::CONTROL), Code::KeyM);
+        let alt_new_key = HotKey::new(Some(Modifiers::ALT), Code::KeyN);
+        let alt_search_key = HotKey::new(Some(Modifiers::ALT), Code::KeyM);
         let (mut new_registered, mut search_registered) = (false, false);
+        let (mut alt_new_registered, mut alt_search_registered) = (false, false);
         if let Some(manager) = &manager {
             match manager.register(new_key) {
                 Ok(()) => new_registered = true,
-                Err(error) => errors.push(format!("Alt+N is unavailable: {error}")),
+                Err(error) => errors.push(format!("Ctrl+N is unavailable: {error}")),
             }
             match manager.register(search_key) {
                 Ok(()) => search_registered = true,
+                Err(error) => errors.push(format!("Ctrl+M is unavailable: {error}")),
+            }
+            match manager.register(alt_new_key) {
+                Ok(()) => alt_new_registered = true,
+                Err(error) => errors.push(format!("Alt+N is unavailable: {error}")),
+            }
+            match manager.register(alt_search_key) {
+                Ok(()) => alt_search_registered = true,
                 Err(error) => errors.push(format!("Alt+M is unavailable: {error}")),
             }
         }
 
         let running = Arc::new(AtomicBool::new(true));
-        let listener = if new_registered || search_registered {
-            let running = Arc::clone(&running);
-            Some(std::thread::spawn(move || {
-                while running.load(Ordering::Relaxed) {
-                    if let Ok(event) =
-                        GlobalHotKeyEvent::receiver().recv_timeout(Duration::from_millis(200))
-                    {
-                        if event.state != HotKeyState::Pressed {
-                            continue;
-                        }
-                        let action = if new_registered && event.id == new_key.id {
-                            Some(HotkeyAction::NewNote)
-                        } else if search_registered && event.id == search_key.id {
-                            Some(HotkeyAction::Search)
-                        } else {
-                            None
-                        };
-                        if let Some(action) = action {
-                            if sender.send(action).is_err() {
-                                break;
+        let listener =
+            if new_registered || search_registered || alt_new_registered || alt_search_registered {
+                let running = Arc::clone(&running);
+                Some(std::thread::spawn(move || {
+                    while running.load(Ordering::Relaxed) {
+                        if let Ok(event) =
+                            GlobalHotKeyEvent::receiver().recv_timeout(Duration::from_millis(200))
+                        {
+                            if event.state != HotKeyState::Pressed {
+                                continue;
                             }
-                            ctx.request_repaint_of(egui::ViewportId::ROOT);
+                            let action = if (new_registered && event.id == new_key.id)
+                                || (alt_new_registered && event.id == alt_new_key.id)
+                            {
+                                Some(HotkeyAction::NewNote)
+                            } else if (search_registered && event.id == search_key.id)
+                                || (alt_search_registered && event.id == alt_search_key.id)
+                            {
+                                Some(HotkeyAction::Search)
+                            } else {
+                                None
+                            };
+                            if let Some(action) = action {
+                                if sender.send(action).is_err() {
+                                    break;
+                                }
+                                ctx.request_repaint_of(egui::ViewportId::ROOT);
+                            }
                         }
                     }
-                }
-            }))
-        } else {
-            None
-        };
+                }))
+            } else {
+                None
+            };
 
         Self {
             _manager: manager,
@@ -117,6 +137,8 @@ impl Hotkeys {
             listener,
             new_registered,
             search_registered,
+            alt_new_registered,
+            alt_search_registered,
             error: (!errors.is_empty()).then(|| errors.join(" ")),
         }
     }
@@ -151,6 +173,11 @@ pub struct NotizApp {
     search_has_focus: bool,
     list_has_focus: bool,
     hotkeys: Hotkeys,
+    tray: Tray,
+    search_visible: bool,
+    hide_search_after_editor: bool,
+    pending_editor_spawn: bool,
+    quitting: bool,
     search_updates: Receiver<SearchUpdate>,
     search_sender: mpsc::Sender<SearchUpdate>,
     active_search: Arc<AtomicU64>,
@@ -174,12 +201,13 @@ impl NotizApp {
         store: Store,
         notes: Vec<Note>,
         settings: Settings,
-    ) -> Self {
-        let mut visuals = egui::Visuals::light();
+    ) -> Result<Self, Box<dyn StdError + Send + Sync>> {
+        let mut visuals = egui::Visuals::dark();
         visuals.panel_fill = PAPER;
         visuals.window_fill = PAPER;
         visuals.override_text_color = Some(INK);
         cc.egui_ctx.set_visuals(visuals);
+        let tray = Tray::new(cc.egui_ctx.clone())?;
 
         let selected = notes.first().map(|note| note.id);
         let draft = notes
@@ -187,7 +215,7 @@ impl NotizApp {
             .map(|note| note.body.clone())
             .unwrap_or_default();
         let (search_sender, search_updates) = mpsc::channel();
-        Self {
+        Ok(Self {
             runtime,
             store,
             notes,
@@ -207,6 +235,11 @@ impl NotizApp {
             search_has_focus: false,
             list_has_focus: false,
             hotkeys: Hotkeys::new(cc.egui_ctx.clone()),
+            tray,
+            search_visible: false,
+            hide_search_after_editor: false,
+            pending_editor_spawn: false,
+            quitting: false,
             search_updates,
             search_sender,
             active_search: Arc::new(AtomicU64::new(0)),
@@ -214,7 +247,7 @@ impl NotizApp {
             semantic_matches: HashSet::new(),
             semantic_pending: false,
             semantic_error: None,
-        }
+        })
     }
 
     fn reload(&mut self) -> bool {
@@ -425,14 +458,13 @@ impl NotizApp {
         self.focus_list_id = Some(id);
     }
 
-    fn open_search(&mut self) {
-        if !self.save_current() {
-            return;
-        }
+    fn open_search(&mut self, ctx: &egui::Context) {
+        self.save_current();
         self.page = Page::Notes;
         self.search.clear();
         self.invalidate_semantic();
         self.focus_search = true;
+        self.show_search_window(ctx);
     }
 
     fn open_editor(&mut self) {
@@ -443,23 +475,68 @@ impl NotizApp {
         }
     }
 
-    fn bring_to_front(ctx: &egui::Context) {
+    fn show_search_window(&mut self, ctx: &egui::Context) {
+        self.search_visible = true;
+        self.hide_search_after_editor = false;
         ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Visible(true));
         ctx.send_viewport_cmd_to(
             egui::ViewportId::ROOT,
             egui::ViewportCommand::Minimized(false),
         );
         ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
-        ctx.request_repaint();
+        ctx.request_repaint_of(egui::ViewportId::ROOT);
+    }
+
+    fn hide_search_window(&mut self, ctx: &egui::Context) {
+        self.search_visible = false;
+        ctx.send_viewport_cmd_to(
+            egui::ViewportId::ROOT,
+            egui::ViewportCommand::Visible(false),
+        );
+    }
+
+    fn new_note(&mut self, ctx: &egui::Context) {
+        let had_editor = self.show_editor;
+        self.create();
+        if self.show_editor {
+            self.hide_search_after_editor = true;
+            self.pending_editor_spawn = !had_editor;
+            self.search_visible = false;
+            if !had_editor {
+                ctx.send_viewport_cmd_to(
+                    egui::ViewportId::ROOT,
+                    egui::ViewportCommand::Visible(true),
+                );
+            }
+            ctx.send_viewport_cmd_to(
+                egui::ViewportId::ROOT,
+                egui::ViewportCommand::Minimized(false),
+            );
+            ctx.request_repaint_of(egui::ViewportId::ROOT);
+        } else {
+            self.show_search_window(ctx);
+        }
     }
 
     fn handle_global_hotkeys(&mut self, ctx: &egui::Context) {
         let global_actions: Vec<_> = self.hotkeys.receiver.try_iter().collect();
         for action in global_actions {
-            Self::bring_to_front(ctx);
             match action {
-                HotkeyAction::NewNote => self.create(),
-                HotkeyAction::Search => self.open_search(),
+                HotkeyAction::NewNote => self.new_note(ctx),
+                HotkeyAction::Search => self.open_search(ctx),
+            }
+        }
+    }
+
+    fn handle_tray_actions(&mut self, ctx: &egui::Context) {
+        for action in self.tray.actions() {
+            match action {
+                TrayAction::NewNote => self.new_note(ctx),
+                TrayAction::Search => self.open_search(ctx),
+                TrayAction::Quit => {
+                    self.quitting = true;
+                    ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+                }
             }
         }
     }
@@ -467,8 +544,8 @@ impl NotizApp {
     fn handle_keyboard(&mut self, ctx: &egui::Context) {
         let keys = ctx.input(|input| {
             (
-                input.modifiers.alt && input.key_pressed(egui::Key::N),
-                input.modifiers.alt && input.key_pressed(egui::Key::M),
+                input.modifiers.command && input.key_pressed(egui::Key::N),
+                input.modifiers.command && input.key_pressed(egui::Key::M),
                 input.modifiers.command && input.key_pressed(egui::Key::Comma),
                 input.key_pressed(egui::Key::Escape),
                 input.key_pressed(egui::Key::ArrowDown),
@@ -476,18 +553,23 @@ impl NotizApp {
                 input.key_pressed(egui::Key::Enter),
                 input.key_pressed(egui::Key::Delete),
                 input.modifiers.command && input.key_pressed(egui::Key::W),
+                input.modifiers.alt && input.key_pressed(egui::Key::N),
+                input.modifiers.alt && input.key_pressed(egui::Key::M),
             )
         });
         if keys.8 {
-            ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+            self.hide_search_window(ctx);
             return;
         }
-        if keys.0 && !self.hotkeys.new_registered {
-            self.create();
+        if (keys.0 && !self.hotkeys.new_registered) || (keys.9 && !self.hotkeys.alt_new_registered)
+        {
+            self.new_note(ctx);
             return;
         }
-        if keys.1 && !self.hotkeys.search_registered {
-            self.open_search();
+        if (keys.1 && !self.hotkeys.search_registered)
+            || (keys.10 && !self.hotkeys.alt_search_registered)
+        {
+            self.open_search(ctx);
             return;
         }
         if keys.2 {
@@ -516,12 +598,17 @@ impl NotizApp {
             } else if keys.3 {
                 self.focus_search = true;
             }
-        } else if self.search_has_focus
-            && keys.4
-            && let Some(id) = self.visible_ids().first().copied()
-        {
-            self.select(id);
-            self.focus_list_id = Some(id);
+        } else if self.search_has_focus && (keys.4 || keys.5) {
+            let visible = self.visible_ids();
+            let id = if keys.4 {
+                visible.first()
+            } else {
+                visible.last()
+            };
+            if let Some(id) = id.copied() {
+                self.select(id);
+                self.focus_list_id = Some(id);
+            }
         }
     }
 
@@ -546,7 +633,7 @@ impl NotizApp {
             [ui.available_width(), 30.0],
             egui::TextEdit::singleline(&mut self.search)
                 .id_salt("note_search")
-                .hint_text("Search notes  ·  Alt+M"),
+                .hint_text("Search notes  ·  Ctrl+M"),
         );
         let focus_search_now = self.focus_search;
         if focus_search_now {
@@ -591,7 +678,7 @@ impl NotizApp {
         if visible.is_empty() {
             ui.add_space(12.0);
             let message = if self.notes.is_empty() {
-                "No notes yet. Press Alt+N to start."
+                "No notes yet. Press Ctrl+N to start."
             } else {
                 "No matching notes."
             };
@@ -633,9 +720,11 @@ impl NotizApp {
             (
                 input.viewport().close_requested()
                     || (input.modifiers.command && input.key_pressed(egui::Key::W)),
+                input.modifiers.command && input.key_pressed(egui::Key::N),
+                input.modifiers.command && input.key_pressed(egui::Key::M),
+                input.modifiers.command && input.key_pressed(egui::Key::Comma),
                 input.modifiers.alt && input.key_pressed(egui::Key::N),
                 input.modifiers.alt && input.key_pressed(egui::Key::M),
-                input.modifiers.command && input.key_pressed(egui::Key::Comma),
             )
         });
         if keys.0 {
@@ -646,20 +735,21 @@ impl NotizApp {
             ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
             return;
         }
-        if keys.1 && !self.hotkeys.new_registered {
-            self.create();
-            ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+        if (keys.1 && !self.hotkeys.new_registered) || (keys.4 && !self.hotkeys.alt_new_registered)
+        {
+            self.new_note(ui.ctx());
             return;
         }
-        if keys.2 && !self.hotkeys.search_registered {
-            self.open_search();
-            Self::bring_to_front(ui.ctx());
+        if (keys.2 && !self.hotkeys.search_registered)
+            || (keys.5 && !self.hotkeys.alt_search_registered)
+        {
+            self.open_search(ui.ctx());
             return;
         }
         if keys.3 {
             self.page = Page::Settings;
             self.focus_settings = true;
-            Self::bring_to_front(ui.ctx());
+            self.show_search_window(ui.ctx());
             return;
         }
 
@@ -741,9 +831,10 @@ impl NotizApp {
         }
         ui.add_space(18.0);
         ui.label(
-            RichText::new("Alt+N  New note     Alt+M  Search     Ctrl+W  Close window")
+            RichText::new("Ctrl+N  New note     Ctrl+M  Search     Ctrl+W  Close window")
                 .color(MUTED),
         );
+        ui.label(RichText::new("Alt+N / Alt+M also work.").color(MUTED));
         ui.label(
             RichText::new("In the note list: ↑/↓ select, Enter open, Delete remove, Esc search.")
                 .color(MUTED),
@@ -762,7 +853,12 @@ impl NotizApp {
 
 impl eframe::App for NotizApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if !self.quitting && ctx.input(|input| input.viewport().close_requested()) {
+            ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::CancelClose);
+            self.hide_search_window(ctx);
+        }
         self.handle_global_hotkeys(ctx);
+        self.handle_tray_actions(ctx);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -791,7 +887,7 @@ impl eframe::App for NotizApp {
 
             if let Some(action) = action {
                 match action {
-                    SidebarAction::Create => self.create(),
+                    SidebarAction::Create => self.new_note(&ctx),
                     SidebarAction::Select(id) => self.select(id),
                     SidebarAction::Open(id) => {
                         self.select(id);
@@ -805,6 +901,11 @@ impl eframe::App for NotizApp {
             }
         }
 
+        if self.pending_editor_spawn {
+            self.pending_editor_spawn = false;
+            ctx.request_repaint_of(egui::ViewportId::ROOT);
+            return;
+        }
         if self.show_editor {
             let mut builder = egui::ViewportBuilder::default()
                 .with_title("Notiz note")
@@ -825,6 +926,15 @@ impl eframe::App for NotizApp {
                 ctx.send_viewport_cmd_to(note_viewport_id(), egui::ViewportCommand::Focus);
                 self.focus_editor_window = false;
             }
+        }
+        if self.hide_search_after_editor && self.show_editor {
+            self.hide_search_window(&ctx);
+            self.hide_search_after_editor = false;
+        } else if !self.search_visible {
+            ctx.send_viewport_cmd_to(
+                egui::ViewportId::ROOT,
+                egui::ViewportCommand::Visible(false),
+            );
         }
     }
 }

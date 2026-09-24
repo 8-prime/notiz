@@ -1,6 +1,7 @@
 mod app;
 mod semantic;
 mod storage;
+mod tray;
 
 use std::{error::Error, path::PathBuf};
 
@@ -27,7 +28,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([420.0, 520.0])
-            .with_min_inner_size([320.0, 320.0]),
+            .with_min_inner_size([320.0, 320.0])
+            .with_visible(false)
+            .with_taskbar(false),
         ..Default::default()
     };
 
@@ -35,9 +38,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "Notiz",
         options,
         Box::new(move |cc| {
-            Ok(Box::new(app::NotizApp::new(
-                cc, runtime, store, notes, settings,
-            )))
+            app::NotizApp::new(cc, runtime, store, notes, settings)
+                .map(|app| Box::new(app) as Box<dyn eframe::App>)
         }),
     )?;
     Ok(())
