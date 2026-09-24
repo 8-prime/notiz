@@ -12,13 +12,14 @@ cargo run
 
 The first launch creates `notes.sqlite3` in the operating system's local application data directory for Notiz. Set `NOTIZ_DATA_DIR` to use a different directory, for example when trying the rewrite without touching your usual notes.
 
-Type in the editor to save a note immediately. The first non-empty line becomes its title in the note list. Search always finds plain text matches.
+Search and the note editor are separate native windows. The editor opens as a small, plain text note with no toolbar; typing saves immediately. The first non-empty line becomes its title in the search window. Search always finds plain text matches.
 
 ## Keyboard
 
-- **Alt+N** creates a note and focuses the editor, even when Notiz is in the background.
-- **Alt+M** brings Notiz forward and focuses search.
-- From search, **Down** moves into the note list. In the list, **Up/Down** selects notes, **Enter** focuses the editor, **Delete** removes the selected note, and **Esc** returns to search. In the editor, **Esc** returns to the list.
+- **Alt+N** creates a note and opens the note window, even when Notiz is in the background.
+- **Alt+M** brings the search window forward and focuses search.
+- **Ctrl+W** closes the focused window. Closing the search window exits Notiz; closing the note window leaves search open.
+- From search, **Down** moves into the note list. In the list, **Up/Down** selects notes, **Enter** opens the selected note, **Delete** removes it, and **Esc** returns to search.
 - **Ctrl+,** opens settings; **Esc** returns to notes.
 
 Global shortcuts depend on OS support and whether another app has already claimed them. If registration fails, the settings page shows the error and the shortcuts still work while Notiz is focused.

@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([980.0, 680.0])
-            .with_min_inner_size([620.0, 400.0]),
+            .with_inner_size([420.0, 520.0])
+            .with_min_inner_size([320.0, 320.0]),
         ..Default::default()
     };
 

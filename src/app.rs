@@ -24,9 +24,13 @@ use crate::{
 const INK: Color32 = Color32::from_rgb(29, 39, 53);
 const MUTED: Color32 = Color32::from_rgb(105, 115, 130);
 const PAPER: Color32 = Color32::from_rgb(249, 250, 252);
-const RAIL: Color32 = Color32::from_rgb(235, 239, 244);
+const NOTE_PAPER: Color32 = Color32::from_rgb(255, 250, 222);
 const ACCENT: Color32 = Color32::from_rgb(53, 96, 143);
 const ERROR: Color32 = Color32::from_rgb(154, 60, 58);
+
+fn note_viewport_id() -> egui::ViewportId {
+    egui::ViewportId::from_hash_of("notiz_note_editor")
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -97,7 +101,7 @@ impl Hotkeys {
                             if sender.send(action).is_err() {
                                 break;
                             }
-                            ctx.request_repaint();
+                            ctx.request_repaint_of(egui::ViewportId::ROOT);
                         }
                     }
                 }
@@ -138,11 +142,12 @@ pub struct NotizApp {
     dirty: bool,
     search: String,
     error: Option<String>,
+    show_editor: bool,
     focus_editor: bool,
+    focus_editor_window: bool,
     focus_search: bool,
     focus_settings: bool,
     focus_list_id: Option<i64>,
-    editor_has_focus: bool,
     search_has_focus: bool,
     list_has_focus: bool,
     hotkeys: Hotkeys,
@@ -158,6 +163,7 @@ pub struct NotizApp {
 enum SidebarAction {
     Create,
     Select(i64),
+    Open(i64),
     Settings,
 }
 
@@ -192,11 +198,12 @@ impl NotizApp {
             dirty: false,
             search: String::new(),
             error: None,
+            show_editor: false,
             focus_editor: false,
+            focus_editor_window: false,
             focus_search: false,
             focus_settings: false,
             focus_list_id: None,
-            editor_has_focus: false,
             search_has_focus: false,
             list_has_focus: false,
             hotkeys: Hotkeys::new(cc.egui_ctx.clone()),
@@ -269,7 +276,7 @@ impl NotizApp {
                     self.search.clear();
                     self.invalidate_semantic();
                     self.select(id);
-                    self.focus_editor = true;
+                    self.open_editor();
                 }
             }
             Err(error) => self.error = Some(format!("Could not create note: {error}")),
@@ -304,6 +311,9 @@ impl NotizApp {
                         .find(|note| Some(note.id) == self.selected)
                         .map(|note| note.body.clone())
                         .unwrap_or_default();
+                    if self.selected.is_none() {
+                        self.show_editor = false;
+                    }
                     self.focus_list_id = self.selected;
                     self.focus_search = self.selected.is_none();
                     self.invalidate_semantic();
@@ -425,10 +435,21 @@ impl NotizApp {
         self.focus_search = true;
     }
 
+    fn open_editor(&mut self) {
+        if self.selected.is_some() {
+            self.show_editor = true;
+            self.focus_editor = true;
+            self.focus_editor_window = true;
+        }
+    }
+
     fn bring_to_front(ctx: &egui::Context) {
-        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
-        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Visible(true));
+        ctx.send_viewport_cmd_to(
+            egui::ViewportId::ROOT,
+            egui::ViewportCommand::Minimized(false),
+        );
+        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
         ctx.request_repaint();
     }
 
@@ -454,8 +475,13 @@ impl NotizApp {
                 input.key_pressed(egui::Key::ArrowUp),
                 input.key_pressed(egui::Key::Enter),
                 input.key_pressed(egui::Key::Delete),
+                input.modifiers.command && input.key_pressed(egui::Key::W),
             )
         });
+        if keys.8 {
+            ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+            return;
+        }
         if keys.0 && !self.hotkeys.new_registered {
             self.create();
             return;
@@ -486,18 +512,16 @@ impl NotizApp {
             } else if keys.5 {
                 self.move_selection(-1);
             } else if keys.6 {
-                self.focus_editor = true;
-                self.list_has_focus = false;
+                self.open_editor();
             } else if keys.3 {
                 self.focus_search = true;
             }
-        } else if self.search_has_focus && keys.4 {
-            if let Some(id) = self.visible_ids().first().copied() {
-                self.select(id);
-                self.focus_list_id = Some(id);
-            }
-        } else if self.editor_has_focus && keys.3 {
-            self.focus_list_id = self.selected;
+        } else if self.search_has_focus
+            && keys.4
+            && let Some(id) = self.visible_ids().first().copied()
+        {
+            self.select(id);
+            self.focus_list_id = Some(id);
         }
     }
 
@@ -548,6 +572,9 @@ impl NotizApp {
                     .color(ERROR),
             );
         }
+        if let Some(error) = &self.error {
+            ui.label(RichText::new(error).small().color(ERROR));
+        }
         ui.add_space(8.0);
 
         let visible: Vec<_> = self
@@ -570,25 +597,29 @@ impl NotizApp {
             };
             ui.label(RichText::new(message).color(MUTED));
         } else {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for (id, title) in visible {
-                    let response = ui.selectable_label(self.selected == Some(id), title);
-                    if self.focus_list_id == Some(id) {
-                        response.request_focus();
-                        self.focus_list_id = None;
-                        self.list_has_focus = true;
-                        self.search_has_focus = false;
-                        self.editor_has_focus = false;
+            let list_height = (ui.available_height() - 42.0).max(80.0);
+            egui::ScrollArea::vertical()
+                .max_height(list_height)
+                .show(ui, |ui| {
+                    for (id, title) in visible {
+                        let response = ui.selectable_label(self.selected == Some(id), title);
+                        if self.focus_list_id == Some(id) {
+                            response.request_focus();
+                            self.focus_list_id = None;
+                            self.list_has_focus = true;
+                            self.search_has_focus = false;
+                        }
+                        if !focus_search_now {
+                            self.list_has_focus |= response.has_focus();
+                        }
+                        if response.clicked() {
+                            action = Some(SidebarAction::Open(id));
+                        } else if response.gained_focus() {
+                            action = Some(SidebarAction::Select(id));
+                        }
+                        ui.add_space(4.0);
                     }
-                    if !focus_search_now {
-                        self.list_has_focus |= response.has_focus();
-                    }
-                    if response.clicked() || response.gained_focus() {
-                        action = Some(SidebarAction::Select(id));
-                    }
-                    ui.add_space(4.0);
-                }
-            });
+                });
         }
         ui.add_space(12.0);
         if ui.button("Settings  ·  Ctrl+,").clicked() {
@@ -597,60 +628,71 @@ impl NotizApp {
         action
     }
 
-    fn editor(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let title = if self.selected.is_some() {
-                note_title(&self.draft)
-            } else {
-                "Your notes"
-            };
-            ui.label(RichText::new(title).size(21.0).strong().color(INK));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if self.selected.is_some() && ui.button("Delete note").clicked() {
-                    self.delete_selected();
+    fn note_window(&mut self, ui: &mut egui::Ui) {
+        let keys = ui.input(|input| {
+            (
+                input.viewport().close_requested()
+                    || (input.modifiers.command && input.key_pressed(egui::Key::W)),
+                input.modifiers.alt && input.key_pressed(egui::Key::N),
+                input.modifiers.alt && input.key_pressed(egui::Key::M),
+                input.modifiers.command && input.key_pressed(egui::Key::Comma),
+            )
+        });
+        if keys.0 {
+            self.save_current();
+            self.show_editor = false;
+            self.focus_editor = false;
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+            ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+            return;
+        }
+        if keys.1 && !self.hotkeys.new_registered {
+            self.create();
+            ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
+            return;
+        }
+        if keys.2 && !self.hotkeys.search_registered {
+            self.open_search();
+            Self::bring_to_front(ui.ctx());
+            return;
+        }
+        if keys.3 {
+            self.page = Page::Settings;
+            self.focus_settings = true;
+            Self::bring_to_front(ui.ctx());
+            return;
+        }
+
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::default()
+                    .fill(NOTE_PAPER)
+                    .inner_margin(egui::Margin::same(14)),
+            )
+            .show(ui, |ui| {
+                if let Some(error) = &self.error {
+                    ui.colored_label(ERROR, error);
+                    if self.dirty && ui.small_button("Retry save").clicked() {
+                        self.save_current();
+                    }
+                }
+                let response = ui.add_sized(
+                    ui.available_size(),
+                    egui::TextEdit::multiline(&mut self.draft)
+                        .id_salt(self.selected)
+                        .frame(egui::Frame::NONE)
+                        .hint_text("Write a note…"),
+                );
+                if self.focus_editor {
+                    response.request_focus();
+                    self.focus_editor = false;
+                }
+                if response.changed() {
+                    self.dirty = true;
+                    self.save_current();
+                    ui.ctx().request_repaint_of(egui::ViewportId::ROOT);
                 }
             });
-        });
-        ui.separator();
-
-        if let Some(error) = &self.error {
-            ui.colored_label(ERROR, error);
-            if self.dirty && ui.button("Retry save").clicked() {
-                self.save_current();
-            }
-            ui.add_space(8.0);
-        }
-
-        if self.selected.is_some() {
-            let response = ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::multiline(&mut self.draft)
-                    .id_salt(self.selected)
-                    .hint_text("Start writing…")
-                    .desired_rows(20),
-            );
-            if self.focus_editor {
-                response.request_focus();
-                self.focus_editor = false;
-                self.editor_has_focus = true;
-                self.list_has_focus = false;
-                self.search_has_focus = false;
-            } else {
-                self.editor_has_focus = response.has_focus();
-            }
-            if response.changed() {
-                self.dirty = true;
-                self.save_current();
-            }
-        } else {
-            self.editor_has_focus = false;
-            ui.add_space(28.0);
-            ui.label(
-                RichText::new("Press Alt+N to create a note.")
-                    .size(17.0)
-                    .color(MUTED),
-            );
-        }
     }
 
     fn settings_page(&mut self, ui: &mut egui::Ui) {
@@ -699,10 +741,11 @@ impl NotizApp {
         }
         ui.add_space(18.0);
         ui.label(
-            RichText::new("Alt+N  New note     Alt+M  Search     Ctrl+,  Settings").color(MUTED),
+            RichText::new("Alt+N  New note     Alt+M  Search     Ctrl+W  Close window")
+                .color(MUTED),
         );
         ui.label(
-            RichText::new("In the note list: ↑/↓ select, Enter edit, Delete remove, Esc search.")
+            RichText::new("In the note list: ↑/↓ select, Enter open, Delete remove, Esc search.")
                 .color(MUTED),
         );
         ui.add_space(18.0);
@@ -733,40 +776,56 @@ impl eframe::App for NotizApp {
                 .frame(
                     egui::Frame::default()
                         .fill(PAPER)
-                        .inner_margin(egui::Margin::same(26)),
+                        .inner_margin(egui::Margin::same(18)),
                 )
                 .show(ui, |ui| self.settings_page(ui));
-            return;
-        }
+        } else {
+            let action = egui::CentralPanel::default()
+                .frame(
+                    egui::Frame::default()
+                        .fill(PAPER)
+                        .inner_margin(egui::Margin::same(18)),
+                )
+                .show(ui, |ui| self.sidebar(ui))
+                .inner;
 
-        let action = egui::Panel::left("notes")
-            .exact_size(270.0)
-            .frame(
-                egui::Frame::default()
-                    .fill(RAIL)
-                    .inner_margin(egui::Margin::same(18)),
-            )
-            .show(ui, |ui| self.sidebar(ui))
-            .inner;
-
-        if let Some(action) = action {
-            match action {
-                SidebarAction::Create => self.create(),
-                SidebarAction::Select(id) => self.select(id),
-                SidebarAction::Settings => {
-                    self.page = Page::Settings;
-                    self.focus_settings = true;
+            if let Some(action) = action {
+                match action {
+                    SidebarAction::Create => self.create(),
+                    SidebarAction::Select(id) => self.select(id),
+                    SidebarAction::Open(id) => {
+                        self.select(id);
+                        self.open_editor();
+                    }
+                    SidebarAction::Settings => {
+                        self.page = Page::Settings;
+                        self.focus_settings = true;
+                    }
                 }
             }
         }
 
-        egui::CentralPanel::default()
-            .frame(
-                egui::Frame::default()
-                    .fill(PAPER)
-                    .inner_margin(egui::Margin::same(26)),
-            )
-            .show(ui, |ui| self.editor(ui));
+        if self.show_editor {
+            let mut builder = egui::ViewportBuilder::default()
+                .with_title("Notiz note")
+                .with_inner_size([340.0, 300.0])
+                .with_min_inner_size([240.0, 200.0]);
+            if self.focus_editor_window {
+                builder = builder.with_active(true);
+            }
+            ctx.show_viewport_immediate(note_viewport_id(), builder, |ui, _class| {
+                self.note_window(ui);
+            });
+            if self.show_editor && self.focus_editor_window {
+                ctx.send_viewport_cmd_to(note_viewport_id(), egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd_to(
+                    note_viewport_id(),
+                    egui::ViewportCommand::Minimized(false),
+                );
+                ctx.send_viewport_cmd_to(note_viewport_id(), egui::ViewportCommand::Focus);
+                self.focus_editor_window = false;
+            }
+        }
     }
 }
 
