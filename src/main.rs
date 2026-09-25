@@ -27,9 +27,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([420.0, 520.0])
-            .with_min_inner_size([320.0, 320.0])
-            .with_visible(false)
+            .with_inner_size([1.0, 1.0])
+            .with_min_inner_size([1.0, 1.0])
+            .with_max_inner_size([1.0, 1.0])
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_mouse_passthrough(true)
+            .with_window_level(egui::WindowLevel::AlwaysOnTop)
             .with_taskbar(false),
         ..Default::default()
     };

@@ -34,6 +34,10 @@ fn note_viewport_id() -> egui::ViewportId {
     egui::ViewportId::from_hash_of("notiz_note_editor")
 }
 
+fn search_viewport_id() -> egui::ViewportId {
+    egui::ViewportId::from_hash_of("notiz_note_search")
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
     Notes,
@@ -175,8 +179,7 @@ pub struct NotizApp {
     hotkeys: Hotkeys,
     tray: Tray,
     search_visible: bool,
-    hide_search_after_editor: bool,
-    pending_editor_spawn: bool,
+    focus_search_window: bool,
     quitting: bool,
     search_updates: Receiver<SearchUpdate>,
     search_sender: mpsc::Sender<SearchUpdate>,
@@ -237,8 +240,7 @@ impl NotizApp {
             hotkeys: Hotkeys::new(cc.egui_ctx.clone()),
             tray,
             search_visible: false,
-            hide_search_after_editor: false,
-            pending_editor_spawn: false,
+            focus_search_window: false,
             quitting: false,
             search_updates,
             search_sender,
@@ -477,41 +479,23 @@ impl NotizApp {
 
     fn show_search_window(&mut self, ctx: &egui::Context) {
         self.search_visible = true;
-        self.hide_search_after_editor = false;
-        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Visible(true));
-        ctx.send_viewport_cmd_to(
-            egui::ViewportId::ROOT,
-            egui::ViewportCommand::Minimized(false),
-        );
-        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
+        self.focus_search_window = true;
         ctx.request_repaint_of(egui::ViewportId::ROOT);
     }
 
     fn hide_search_window(&mut self, ctx: &egui::Context) {
         self.search_visible = false;
-        ctx.send_viewport_cmd_to(
-            egui::ViewportId::ROOT,
-            egui::ViewportCommand::Visible(false),
-        );
+        self.focus_search_window = false;
+        ctx.send_viewport_cmd_to(search_viewport_id(), egui::ViewportCommand::Close);
+        ctx.request_repaint_of(egui::ViewportId::ROOT);
     }
 
     fn new_note(&mut self, ctx: &egui::Context) {
-        let had_editor = self.show_editor;
         self.create();
         if self.show_editor {
-            self.hide_search_after_editor = true;
-            self.pending_editor_spawn = !had_editor;
-            self.search_visible = false;
-            if !had_editor {
-                ctx.send_viewport_cmd_to(
-                    egui::ViewportId::ROOT,
-                    egui::ViewportCommand::Visible(true),
-                );
+            if self.search_visible {
+                self.hide_search_window(ctx);
             }
-            ctx.send_viewport_cmd_to(
-                egui::ViewportId::ROOT,
-                egui::ViewportCommand::Minimized(false),
-            );
             ctx.request_repaint_of(egui::ViewportId::ROOT);
         } else {
             self.show_search_window(ctx);
@@ -785,6 +769,52 @@ impl NotizApp {
             });
     }
 
+    fn search_window(&mut self, ui: &mut egui::Ui) {
+        if ui.input(|input| input.viewport().close_requested()) {
+            self.hide_search_window(ui.ctx());
+            return;
+        }
+
+        self.handle_keyboard(ui.ctx());
+        if !self.search_visible {
+            return;
+        }
+
+        if self.page == Page::Settings {
+            egui::CentralPanel::default()
+                .frame(
+                    egui::Frame::default()
+                        .fill(PAPER)
+                        .inner_margin(egui::Margin::same(18)),
+                )
+                .show(ui, |ui| self.settings_page(ui));
+        } else {
+            let action = egui::CentralPanel::default()
+                .frame(
+                    egui::Frame::default()
+                        .fill(PAPER)
+                        .inner_margin(egui::Margin::same(18)),
+                )
+                .show(ui, |ui| self.sidebar(ui))
+                .inner;
+
+            if let Some(action) = action {
+                match action {
+                    SidebarAction::Create => self.new_note(ui.ctx()),
+                    SidebarAction::Select(id) => self.select(id),
+                    SidebarAction::Open(id) => {
+                        self.select(id);
+                        self.open_editor();
+                    }
+                    SidebarAction::Settings => {
+                        self.page = Page::Settings;
+                        self.focus_settings = true;
+                    }
+                }
+            }
+        }
+    }
+
     fn settings_page(&mut self, ui: &mut egui::Ui) {
         ui.heading("Settings");
         ui.label(RichText::new("Semantic search").size(18.0).strong());
@@ -852,10 +882,13 @@ impl NotizApp {
 }
 
 impl eframe::App for NotizApp {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        [0.0; 4]
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if !self.quitting && ctx.input(|input| input.viewport().close_requested()) {
             ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::CancelClose);
-            self.hide_search_window(ctx);
         }
         self.handle_global_hotkeys(ctx);
         self.handle_tray_actions(ctx);
@@ -865,47 +898,32 @@ impl eframe::App for NotizApp {
         let ctx = ui.ctx().clone();
         self.poll_search_updates();
         self.start_due_search(&ctx);
-        self.handle_keyboard(&ctx);
 
-        if self.page == Page::Settings {
-            egui::CentralPanel::default()
-                .frame(
-                    egui::Frame::default()
-                        .fill(PAPER)
-                        .inner_margin(egui::Margin::same(18)),
-                )
-                .show(ui, |ui| self.settings_page(ui));
-        } else {
-            let action = egui::CentralPanel::default()
-                .frame(
-                    egui::Frame::default()
-                        .fill(PAPER)
-                        .inner_margin(egui::Margin::same(18)),
-                )
-                .show(ui, |ui| self.sidebar(ui))
-                .inner;
-
-            if let Some(action) = action {
-                match action {
-                    SidebarAction::Create => self.new_note(&ctx),
-                    SidebarAction::Select(id) => self.select(id),
-                    SidebarAction::Open(id) => {
-                        self.select(id);
-                        self.open_editor();
-                    }
-                    SidebarAction::Settings => {
-                        self.page = Page::Settings;
-                        self.focus_settings = true;
-                    }
-                }
+        if self.search_visible {
+            let mut builder = egui::ViewportBuilder::default()
+                .with_title("Notiz")
+                .with_inner_size([420.0, 520.0])
+                .with_min_inner_size([320.0, 320.0]);
+            if self.focus_search_window {
+                builder = builder.with_active(true);
+            }
+            ctx.show_viewport_immediate(search_viewport_id(), builder, |ui, _class| {
+                self.search_window(ui);
+            });
+            if self.search_visible && self.focus_search_window {
+                ctx.send_viewport_cmd_to(
+                    search_viewport_id(),
+                    egui::ViewportCommand::Visible(true),
+                );
+                ctx.send_viewport_cmd_to(
+                    search_viewport_id(),
+                    egui::ViewportCommand::Minimized(false),
+                );
+                ctx.send_viewport_cmd_to(search_viewport_id(), egui::ViewportCommand::Focus);
+                self.focus_search_window = false;
             }
         }
 
-        if self.pending_editor_spawn {
-            self.pending_editor_spawn = false;
-            ctx.request_repaint_of(egui::ViewportId::ROOT);
-            return;
-        }
         if self.show_editor {
             let mut builder = egui::ViewportBuilder::default()
                 .with_title("Notiz note")
@@ -926,15 +944,6 @@ impl eframe::App for NotizApp {
                 ctx.send_viewport_cmd_to(note_viewport_id(), egui::ViewportCommand::Focus);
                 self.focus_editor_window = false;
             }
-        }
-        if self.hide_search_after_editor && self.show_editor {
-            self.hide_search_window(&ctx);
-            self.hide_search_after_editor = false;
-        } else if !self.search_visible {
-            ctx.send_viewport_cmd_to(
-                egui::ViewportId::ROOT,
-                egui::ViewportCommand::Visible(false),
-            );
         }
     }
 }
