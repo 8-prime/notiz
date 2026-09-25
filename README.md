@@ -12,6 +12,16 @@ cargo run
 
 The first launch creates `notes.sqlite3` in the operating system's local application data directory for Notiz. Set `NOTIZ_DATA_DIR` to use a different directory, for example when trying the rewrite without touching your usual notes.
 
+### Install on Windows
+
+Quit any running Notiz app from its tray menu, then run this in PowerShell from the project directory:
+
+```powershell
+.\scripts\install-windows.ps1
+```
+
+The script builds a release executable, copies it to `%LOCALAPPDATA%\Programs\Notiz`, and adds shortcuts to your Start menu and your personal Startup folder. Notiz then starts in the tray when you sign in to Windows. The release build does not open a console window. To stop automatic launch, remove `Notiz v2.lnk` from `shell:startup` or disable it in Windows Startup settings. Notes remain in the local application data directory when you replace or remove the executable.
+
 Notiz starts in the system tray with no window open. The tray menu can open a new note, open search, or quit the app. Search and the note editor are separate native windows with a dark theme. The editor opens as a small, plain text window with no toolbar; typing saves immediately. The first non-empty line becomes its title in the search window. Search always finds plain text matches.
 
 ## Keyboard
