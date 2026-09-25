@@ -16,9 +16,8 @@ Notiz starts in the system tray with no window open. The tray menu can open a ne
 
 ## Keyboard
 
-- **Ctrl+N** creates a note and opens only the note window, even when Notiz is in the background.
-- **Ctrl+M** opens the notes list with search focused.
-- **Alt+N** and **Alt+M** remain available as aliases for those actions.
+- **Alt+N** creates a note and opens only the note window, even when Notiz is in the background.
+- **Alt+M** opens the notes list with search focused.
 - **Ctrl+W** closes the focused window. Notiz remains in the tray; use its menu to quit.
 - From search, **Down/Up** moves into the note list at its first/last match. In the list, **Up/Down** selects notes, **Enter** opens the selected note, **Delete** removes it, and **Esc** returns to search.
 - **Ctrl+,** opens settings; **Esc** returns to notes.

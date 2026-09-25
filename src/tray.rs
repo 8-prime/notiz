@@ -23,8 +23,8 @@ pub struct Tray {
 
 impl Tray {
     pub fn new(ctx: egui::Context) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let new_note = MenuItem::with_id("new-note", "New note  (Ctrl+N)", true, None);
-        let search = MenuItem::with_id("search", "Search notes  (Ctrl+M)", true, None);
+        let new_note = MenuItem::with_id("new-note", "New note  (Alt+N)", true, None);
+        let search = MenuItem::with_id("search", "Search notes  (Alt+M)", true, None);
         let quit = MenuItem::with_id("quit", "Quit Notiz", true, None);
         let menu = Menu::new();
         menu.append(&new_note)?;
